@@ -24,6 +24,8 @@
             <span class="value">{format(params[field.key], field)}</span>
           {:else if field.type === 'seed'}
             <span class="value">{params[field.key]}</span>
+          {:else if field.type === 'icon'}
+            <span class="value">{iconName(params[field.key])}</span>
           {/if}
         </div>
 
@@ -85,6 +87,33 @@
           >
             {params[field.key] ? 'On' : 'Off'}
           </button>
+        {:else if field.type === 'icon'}
+          <div class="icon-picker">
+            <input
+              type="search"
+              placeholder="Search Lucide icons"
+              bind:value={iconQuery}
+            />
+            <div class="icon-grid">
+              {#each iconHits as icon (icon.id)}
+                <button
+                  type="button"
+                  class="mark-btn"
+                  class:on={params[field.key] === icon.id}
+                  title={icon.name}
+                  on:click={() => pickIcon(field.key, icon.id)}
+                >
+                  {@html markPreview(icon.id)}
+                </button>
+              {/each}
+            </div>
+            {#if iconSearching}
+              <p class="icon-empty">Searching…</p>
+            {:else if !iconHits.length}
+              <p class="icon-empty">No icons match.</p>
+            {/if}
+            <p class="icon-credit">Icons by Lucide · ISC</p>
+          </div>
         {:else if field.type === 'seed'}
           <div class="seed-row">
             <code>{params[field.key]}</code>
@@ -97,6 +126,7 @@
 
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { MARKS, searchIconNames, ensureMark, markPreview, getMark } from '../lib/marks.js';
 
   export let schema = [];
   export let params = {};
@@ -104,6 +134,37 @@
   export let dirty = false;
 
   const dispatch = createEventDispatcher();
+  let iconQuery = '';
+  let iconHits = MARKS;
+  let iconSearching = false;
+  let searchGen = 0;
+
+  $: runIconSearch(iconQuery);
+
+  function iconName(id) {
+    return getMark(id).name;
+  }
+
+  async function runIconSearch(query) {
+    const needle = String(query || '').trim();
+    const gen = ++searchGen;
+    if (!needle) {
+      iconHits = MARKS;
+      iconSearching = false;
+      return;
+    }
+    iconSearching = true;
+    const ids = searchIconNames(needle);
+    const loaded = await Promise.all(ids.map((id) => ensureMark(id)));
+    if (gen !== searchGen) return;
+    iconHits = loaded.filter((item, index, list) => item && list.findIndex((other) => other.id === item.id) === index);
+    iconSearching = false;
+  }
+
+  async function pickIcon(key, id) {
+    await ensureMark(id);
+    set(key, id);
+  }
 
   $: visibleFields = schema.filter((field) => !field.showIf || field.showIf(params));
 
@@ -134,6 +195,7 @@
     const step = field.step || 1;
     if (step >= 1) return String(Math.round(value));
     if (step >= 0.1) return value.toFixed(1);
+    if (step >= 0.01) return value.toFixed(2);
     return String(value);
   }
 </script>
@@ -290,5 +352,63 @@
 
   .none-on {
     color: var(--accent);
+  }
+
+  .icon-picker input[type='search'] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    outline: none;
+    margin-bottom: 8px;
+  }
+
+  .icon-picker input[type='search']:focus {
+    border-color: var(--accent);
+  }
+
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+
+  .mark-btn {
+    margin: 0;
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    padding: 6px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .mark-btn :global(svg) {
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+
+  .mark-btn.on {
+    color: var(--bg);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .icon-empty,
+  .icon-credit {
+    margin: 8px 0 0;
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+
+  .icon-credit {
+    letter-spacing: 0.04em;
   }
 </style>

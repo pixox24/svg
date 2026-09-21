@@ -17,6 +17,7 @@
   "type": "module",
   "dependencies": {
     "@codemirror/lang-css": "^6.0.0",
+    "@lucide/icons": "^1.47.0",
     "codemirror": "^6.0.1",
     "css-doodle": "^0.50.2",
     "tabbied": "^0.5.2"

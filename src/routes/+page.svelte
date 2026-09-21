@@ -1,43 +1,66 @@
 <main class:collapsed={inspectorCollapsed}>
-  <Sidebar {base} {selectedId} {activeLookId} on:select={handleSelectSketch} />
+  <Sidebar
+    {base}
+    {selectedId}
+    {activeLookId}
+    {libraryOpen}
+    tabbiedActive={isTabbied}
+    tabbiedName={isTabbied ? lookName : ''}
+    on:select={handleSelectSketch}
+    on:library={openLibrary}
+  />
 
-  <section class="stage" class:ink={stage === 'ink'} class:full>
-    <header class="stage-bar">
-      <div class="identity">
-        {#if isCustom}
-          <p class="family-label">Custom</p>
-          <h2>From URL</h2>
-        {:else}
-          <p class="family-label">{current?.familyLabel || ''}</p>
-          <h2>{lookName}</h2>
-        {/if}
-      </div>
-      <div class="tabs">
-        <button type="button" class:on={tab === 'graph'} on:click={() => setPreviewTab('graph')}>Preview</button>
-        <button type="button" class:on={tab === 'svg'} on:click={() => setPreviewTab('svg')}>SVG</button>
-      </div>
-    </header>
-
-    <div
-      class="canvas"
-      class:svg={tab === 'svg' && !isTabbied}
-      class:doodle={isTabbied}
-    >
-      {#if isTabbied}
-        <div class="doodle-layer" class:hidden={tab === 'svg'}>
+  <section class="stage">
+    {#if libraryOpen}
+      <TabbiedLibrary
+        selectedSlug={slugFromId(selectedId) || ''}
+        initialQuery={libraryQuery}
+        on:select={handleLibrarySelect}
+        on:close={closeLibrary}
+      />
+    {:else}
+    <div class="mat">
+      <div class="piece">
+        <div
+          class="sheet"
+          class:ink={stage === 'ink' && tab === 'graph'}
+          class:source={tab === 'svg'}
+        >
           {#key selectedId}
-            <TabbiedStage bind:this={tabbiedStage} definition={family.definition} {params} />
+            <div class="print">
+              {#if isTabbied}
+                <div class="doodle-layer" class:hidden={tab === 'svg'}>
+                  <TabbiedStage bind:this={tabbiedStage} definition={family.definition} {params} />
+                </div>
+                {#if tab === 'svg'}
+                  <pre class="source-view">{tabbiedSvg}</pre>
+                {/if}
+              {:else if tab === 'graph'}
+                {@html svgCode}
+              {:else}
+                <pre class="source-view">{svgCode}</pre>
+              {/if}
+            </div>
           {/key}
         </div>
-        {#if tab === 'svg'}
-          <pre class="svg-overlay">{tabbiedSvg}</pre>
-        {/if}
-      {:else if tab === 'graph'}
-        {@html svgCode}
-      {:else}
-        <pre>{svgCode}</pre>
-      {/if}
+        <footer class="caption">
+          <div class="identity">
+            {#if isCustom}
+              <p class="family-label">Custom</p>
+              <h2>From URL</h2>
+            {:else}
+              <p class="family-label">{current?.familyLabel || ''}</p>
+              <h2>{lookName}</h2>
+            {/if}
+          </div>
+          <div class="view-tabs">
+            <button type="button" class:on={tab === 'graph'} on:click={() => setPreviewTab('graph')}>Preview</button>
+            <button type="button" class:on={tab === 'svg'} on:click={() => setPreviewTab('svg')}>SVG</button>
+          </div>
+        </footer>
+      </div>
     </div>
+    {/if}
   </section>
 
   <aside class="inspector">
@@ -48,7 +71,9 @@
     {:else}
       <header class="inspector-bar">
         <div class="mode">
-          {#if family}
+          {#if libraryOpen}
+            <p class="kicker">Library</p>
+          {:else if family}
             <div class="tabs mode-tabs">
               <button type="button" class:on={inspectorTab === 'look'} on:click={() => inspectorTab = 'look'}>Look</button>
               <button type="button" class:on={inspectorTab === 'source'} on:click={() => inspectorTab = 'source'}>Source</button>
@@ -74,7 +99,11 @@
           </a>
         </div>
       </header>
-      {#if family && inspectorTab === 'look'}
+      {#if libraryOpen}
+        <div class="look-body">
+          <p class="library-hint">Pick a pattern on the wall.</p>
+        </div>
+      {:else if family && inspectorTab === 'look'}
         <div class="look-body">
           <LookPanel
             schema={family.schema}
@@ -102,7 +131,7 @@
         </div>
         {#if exportNote}
           <p>{exportNote}</p>
-        {:else if current?.blurb}
+        {:else if !libraryOpen && current?.blurb}
           <p>{current.blurb}</p>
         {/if}
       </footer>
@@ -119,14 +148,19 @@
   import Sidebar from '../components/Sidebar.svelte';
   import LookPanel from '../components/LookPanel.svelte';
   import TabbiedStage from '../components/TabbiedStage.svelte';
+  import TabbiedLibrary from '../components/TabbiedLibrary.svelte';
   import { supportsSvgExport } from 'tabbied';
   import {
     allSketches,
     getSketch,
     familyForSketch,
     matchingPreset,
-    DEFAULT_ID
+    DEFAULT_ID,
+    slugFromId,
+    tabbiedId,
+    TABBIED_CATALOG
   } from '../catalog.js';
+  import { loadTabbiedFamily, warmupPatterns } from '../tabbiedCatalog.js';
   import { stageFromBg } from '../lib/rng.js';
   import { copyText, downloadFile, svgBlob, svgToPngBlob } from '../lib/export.js';
 
@@ -145,13 +179,15 @@
   let noteTimer;
   let tabbiedStage;
   let tabbiedSvg = '';
+  let libraryOpen = false;
+  let libraryQuery = '';
+  let loadGen = 0;
 
   $: current = getSketch(selectedId);
   $: isTabbied = family?.kind === 'tabbied';
   $: isCustom = !isNull(codeFromQuery) || selectedId === 'other';
   $: rendered = isTabbied ? '' : svg(code);
   $: svgCode = tab === 'svg' ? prettySVG(rendered) : rendered;
-  $: full = /preserveAspectRatio/i.test(code);
   $: preset = family ? matchingPreset(family, params) : null;
   $: dirty = Boolean(family) && !preset && !ejected;
   $: lookName = isCustom ? 'From URL' : ejected ? `${current?.name || 'Look'} · edited` : (preset?.name || (dirty ? 'Custom' : current?.name || ''));
@@ -231,12 +267,54 @@
     loadSketch(e.target.value);
   }
 
-  function loadSketch(id) {
+  function openLibrary() {
+    libraryOpen = true;
+    warmupPatterns();
+  }
+
+  function closeLibrary() {
+    libraryOpen = false;
+    libraryQuery = '';
+  }
+
+  function handleLibrarySelect(e) {
+    loadSketch(tabbiedId(e.detail));
+  }
+
+  async function loadSketch(id) {
+    const gen = ++loadGen;
+    const slug = slugFromId(id);
+    if (slug) {
+      try {
+        const nextFamily = await loadTabbiedFamily(slug);
+        if (gen !== loadGen) return;
+        const sketch = nextFamily.variants[0];
+        selectedId = sketch.id;
+        family = nextFamily;
+        ejected = false;
+        codeFromQuery = undefined;
+        libraryOpen = false;
+        params = clone(sketch.params);
+        code = nextFamily.compile(params);
+        inspectorTab = 'look';
+        tab = 'graph';
+        if (editor) editor.updateCode(code);
+        updateUrl(sketch.id);
+        return;
+      } catch (error) {
+        if (gen !== loadGen) return;
+        note(error.message || 'Pattern failed to load');
+        id = DEFAULT_ID;
+      }
+    }
+
     const sketch = getSketch(id) || getSketch(DEFAULT_ID);
+    if (gen !== loadGen) return;
     selectedId = sketch.id;
     family = familyForSketch(sketch.id);
     ejected = false;
     codeFromQuery = undefined;
+    libraryOpen = false;
     if (family && sketch.params) {
       params = clone(sketch.params);
       code = family.compile(params);
@@ -356,15 +434,28 @@
   }
 
   function stepVariant(dir) {
-    const family = familyForSketch(selectedId);
-    if (!family) return;
-    const index = family.variants.findIndex((item) => item.id === selectedId);
-    const next = family.variants[(index + dir + family.variants.length) % family.variants.length];
+    const slug = slugFromId(selectedId);
+    if (slug) {
+      const index = TABBIED_CATALOG.findIndex((item) => item.slug === slug);
+      if (index < 0) return;
+      const next = TABBIED_CATALOG[(index + dir + TABBIED_CATALOG.length) % TABBIED_CATALOG.length];
+      loadSketch(tabbiedId(next.slug));
+      return;
+    }
+    const currentFamily = familyForSketch(selectedId);
+    if (!currentFamily) return;
+    const index = currentFamily.variants.findIndex((item) => item.id === selectedId);
+    const next = currentFamily.variants[(index + dir + currentFamily.variants.length) % currentFamily.variants.length];
     loadSketch(next.id);
   }
 
   function onKey(e) {
+    if (e.key === 'Escape' && libraryOpen) {
+      closeLibrary();
+      return;
+    }
     if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+    if (libraryOpen) return;
     if (e.key === 'ArrowLeft') stepVariant(-1);
     if (e.key === 'ArrowRight') stepVariant(1);
     if (e.key === '\\') toggleInspector();
@@ -431,45 +522,148 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: var(--paper);
-    color: #1c1916;
-  }
-
-  .stage.ink {
-    background: var(--ink);
+    background: var(--wall);
     color: var(--text);
   }
 
-  .stage-bar {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 18px 22px 0;
-    pointer-events: none;
+  .mat {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    padding: clamp(20px, 5.5%, 48px) clamp(24px, 11%, 80px) 18px;
+    container-type: size;
+    display: grid;
+    place-items: center;
   }
 
-  .stage-bar > * {
-    pointer-events: auto;
+  .piece {
+    --caption-stack: 4.35rem;
+    width: min(100cqi, calc(100cqb - var(--caption-stack)));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .sheet {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--paper);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.28),
+      0 1px 1px rgba(0, 0, 0, 0.12),
+      0 24px 48px -18px rgba(0, 0, 0, 0.55);
+  }
+
+  .sheet.ink {
+    background: var(--ink);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.08),
+      0 1px 1px rgba(0, 0, 0, 0.35),
+      0 24px 48px -18px rgba(0, 0, 0, 0.7);
+  }
+
+  .sheet.source {
+    background: var(--paper);
+  }
+
+  .print {
+    position: absolute;
+    inset: 0;
+    animation: settle 200ms ease;
+  }
+
+  @keyframes settle {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .doodle-layer {
+    position: absolute;
+    inset: 0;
+  }
+
+  .doodle-layer.hidden {
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .sheet :global(svg) {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .source-view {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    margin: 0;
+    padding: 22px 24px;
+    overflow: auto;
+    background: var(--paper);
+    color: #1c1916;
+    white-space: pre-wrap;
+    user-select: all;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+
+  .caption {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .identity {
+    min-width: 0;
   }
 
   .family-label {
     margin: 0;
-    font-size: 11px;
-    letter-spacing: 0.16em;
+    font-size: 10px;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--text-faint);
   }
 
-  .stage.ink .family-label {
-    color: var(--text-dim);
-  }
-
   .identity h2 {
     margin: 4px 0 0;
-    font-size: 1.35rem;
-    font-weight: 560;
+    font-size: 1.05rem;
+    font-weight: 500;
     letter-spacing: -0.03em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .view-tabs {
+    display: flex;
+    gap: 14px;
+    flex-shrink: 0;
+    padding-bottom: 2px;
+  }
+
+  .view-tabs button {
+    margin: 0;
+    border: 0;
+    padding: 0 0 3px;
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .view-tabs button.on {
+    color: var(--text);
+    box-shadow: 0 1px 0 var(--accent);
   }
 
   .tabs {
@@ -477,10 +671,6 @@
     padding: 2px;
     background: rgba(12, 13, 16, 0.06);
     border-radius: 999px;
-  }
-
-  .stage.ink .tabs {
-    background: rgba(255, 255, 255, 0.06);
   }
 
   .tabs button {
@@ -501,79 +691,6 @@
     background: #fff;
     color: #1c1916;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  }
-
-  .stage.ink .tabs button.on {
-    background: var(--bg-elev-2);
-    color: var(--text);
-  }
-
-  .canvas {
-    flex: 1;
-    min-height: 0;
-    display: grid;
-    place-items: center;
-    padding: 4vmax 5vmax 5vmax;
-    overflow: auto;
-  }
-
-  .stage.full .canvas {
-    padding: 0;
-  }
-
-  .canvas.doodle {
-    padding: 0;
-    display: block;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .doodle-layer {
-    position: absolute;
-    inset: 0;
-  }
-
-  .doodle-layer.hidden {
-    visibility: hidden;
-    pointer-events: none;
-    opacity: 0;
-  }
-
-  .canvas pre.svg-overlay {
-    position: relative;
-    z-index: 1;
-    height: 100%;
-    overflow: auto;
-    margin: 0;
-    padding: 28px 24px;
-    background: var(--paper);
-    color: #1c1916;
-    opacity: 1;
-  }
-
-  .canvas :global(svg) {
-    max-width: 100%;
-    max-height: 100%;
-  }
-
-  .stage.full .canvas :global(svg) {
-    width: 100%;
-    height: 100%;
-  }
-
-  .canvas.svg {
-    display: block;
-    place-items: normal;
-    padding: 28px 24px 32px;
-  }
-
-  .canvas pre {
-    margin: 0;
-    white-space: pre-wrap;
-    user-select: all;
-    font-size: 12.5px;
-    line-height: 1.5;
-    opacity: 0.86;
   }
 
   .inspector {
@@ -657,6 +774,12 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
+  }
+
+  .library-hint {
+    margin: 24px 16px;
+    font-size: 13px;
+    color: var(--text-dim);
   }
 
   .mode-tabs {
@@ -746,11 +869,14 @@
         "stage"
         "inspector";
     }
-    .stage-bar {
-      padding: 12px 14px 0;
+    .mat {
+      padding: 16px 16px 12px;
     }
-    .canvas.svg {
-      padding: 16px;
+    .piece {
+      --caption-stack: 3.8rem;
+    }
+    .identity h2 {
+      font-size: 0.95rem;
     }
   }
 </style>

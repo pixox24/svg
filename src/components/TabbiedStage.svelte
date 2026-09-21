@@ -2,7 +2,7 @@
 
 <script>
   import { onMount } from 'svelte';
-  import { createPattern } from 'tabbied';
+  import { createPattern, gridToLevel } from 'tabbied';
 
   export let definition;
   export let params;
@@ -19,13 +19,19 @@
   }
 
   function snapshot(next = params) {
-    return {
+    const options = optionMap(next);
+    const config = {
       pattern: definition,
       seed: String(next.seed || 'Play'),
       palette: next.palette,
-      options: optionMap(next),
+      options,
       fit: 'grid'
     };
+    // fit:"grid" ignores the authored grid unless density is set.
+    if (typeof options.grid === 'string') {
+      config.density = gridToLevel(options.grid);
+    }
+    return config;
   }
 
   function apply() {
