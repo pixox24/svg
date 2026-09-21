@@ -1,17 +1,4 @@
-import {
-  radius,
-  blossom,
-  bauhaus,
-  windowpane,
-  mixtape,
-  odessa,
-  veil,
-  disque,
-  cascade,
-  annulus,
-  battlement,
-  bokeh
-} from 'tabbied/patterns';
+import catalogJson from 'tabbied/catalog.json';
 import {
   buildDoodleSource,
   expandPalette,
@@ -20,20 +7,57 @@ import {
 } from 'tabbied';
 import { stageFromBg } from './lib/rng.js';
 
-const PRESETS = [
-  radius,
-  blossom,
-  bauhaus,
-  windowpane,
-  mixtape,
-  odessa,
-  veil,
-  disque,
-  cascade,
-  annulus,
-  battlement,
-  bokeh
-];
+const catalog = catalogJson.default || catalogJson;
+export const TABBIED_CATALOG = catalog.designs;
+export const TABBIED_COUNT = catalog.count || catalog.designs.length;
+export const TABBIED_MOODS = ['bold', 'playful', 'retro', 'calm', 'festive', 'technical', 'elegant', 'organic'];
+export const TABBIED_DENSITIES = ['sparse', 'medium', 'dense'];
+
+const cache = new Map();
+let patternsModule;
+
+export function tabbiedId(slug) {
+  return `tabbied-${slug}`;
+}
+
+export function slugFromId(id) {
+  return id && id.startsWith('tabbied-') ? id.slice('tabbied-'.length) : null;
+}
+
+export function previewUrl(slug) {
+  return `https://tabbied.com/previews/${slug}.webp`;
+}
+
+export function catalogEntry(slug) {
+  return TABBIED_CATALOG.find((item) => item.slug === slug) || null;
+}
+
+export function getTabbiedFamily(slug) {
+  return cache.get(slug) || null;
+}
+
+export function warmupPatterns() {
+  if (patternsModule) return Promise.resolve(patternsModule);
+  return import('tabbied/patterns').then((mod) => {
+    patternsModule = mod;
+    return mod;
+  });
+}
+
+export async function loadTabbiedFamily(slug) {
+  const hit = cache.get(slug);
+  if (hit) return hit;
+  if (!patternsModule) {
+    patternsModule = await warmupPatterns();
+  }
+  const definition = patternsModule.patterns?.[slug] || patternsModule[slug];
+  if (!definition) {
+    throw new Error(`Unknown Tabbied pattern: ${slug}`);
+  }
+  const family = wrap(definition);
+  cache.set(slug, family);
+  return family;
+}
 
 function optionField(option) {
   if (option.type === 'Slider') {
@@ -73,32 +97,19 @@ function defaultParams(definition) {
   return params;
 }
 
-function tagsFor(definition) {
-  const tags = ['pattern'];
-  const organic = ['petals', 'leaves', 'scallops', 'waves', 'organic'];
-  if ((definition.tags || []).some((tag) => organic.includes(tag)) || (definition.mood || []).includes('organic')) {
-    tags.push('organic');
-  }
-  if (definition.slug === 'bauhaus') tags.push('mark');
-  return tags;
-}
-
 function wrap(definition) {
   const params = defaultParams(definition);
-  const schema = [
-    { key: 'palette', type: 'palette', label: 'Palette' },
-    ...definition.options.map(optionField)
-  ];
   const family = {
     kind: 'tabbied',
-    id: `tabbied-${definition.slug}`,
+    id: tabbiedId(definition.slug),
     label: definition.name,
-    blurb: (definition.description && definition.description.length > 40
-      ? definition.description
-      : ((definition.tags || []).slice(0, 3).join(' · '))) || 'A Tabbied cell pattern.',
-    tags: tagsFor(definition),
+    blurb: definition.description || ((definition.tags || []).slice(0, 3).join(' · ')) || 'A Tabbied cell pattern.',
+    tags: ['pattern'],
     definition,
-    schema,
+    schema: [
+      { key: 'palette', type: 'palette', label: 'Palette' },
+      ...definition.options.map(optionField)
+    ],
     svgExport: supportsSvgExport(definition),
     svgExportNote: definition.svgExportNote || '',
     compile(current) {
@@ -118,17 +129,14 @@ function wrap(definition) {
     },
     variants: [
       {
-        id: `tabbied-${definition.slug}`,
+        id: tabbiedId(definition.slug),
         name: definition.name,
         params,
         stage: stageFromBg(params.palette[0]),
-        preview: `/thumbs/tabbied-${definition.slug}.webp`
+        preview: previewUrl(definition.slug)
       }
     ]
   };
   family.variants[0].code = family.compile(params);
-  family.variants[0].stage = stageFromBg(params.palette[0]);
   return family;
 }
-
-export const tabbiedFamilies = PRESETS.map(wrap);

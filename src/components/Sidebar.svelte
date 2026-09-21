@@ -65,25 +65,19 @@
       {/each}
     {/if}
 
-    {#if visibleTabbied.length}
+    {#if showTabbied}
       <h2>Tabbied</h2>
-      {#each visibleTabbied as family}
-        <article class="family" class:active={selectedFamilyId === family.id}>
-          <button
-            type="button"
-            class="family-hit"
-            on:click={() => dispatch('select', family.variants[0].id)}
-          >
-            <span class="cover">
-              <img src="{base}/thumbs/{family.id}.webp" alt="" />
-            </span>
-            <span class="meta">
-              <span class="name">{family.label}</span>
-              <span class="sub">{family.blurb}</span>
-            </span>
-          </button>
-        </article>
-      {/each}
+      <article class="family" class:active={tabbiedActive || libraryOpen}>
+        <button type="button" class="family-hit" on:click={() => dispatch('library')}>
+          <span class="cover">
+            <img src={previewUrl('radius')} alt="" />
+          </span>
+          <span class="meta">
+            <span class="name">Tabbied</span>
+            <span class="sub">{tabbiedName || `${TABBIED_COUNT} cell patterns`}</span>
+          </span>
+        </button>
+      </article>
       <p class="credit">Cell patterns from Tabbied · MIT</p>
     {/if}
 
@@ -106,7 +100,7 @@
       </div>
     {/if}
 
-    {#if !visibleFamilies.length && !visibleTabbied.length && !visibleClassics.length}
+    {#if !visibleFamilies.length && !showTabbied && !visibleClassics.length}
       <p class="empty">No matches.</p>
     {/if}
   </div>
@@ -114,11 +108,14 @@
 
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { TAGS, families, classics, familyForSketch, tabbiedFamilies } from '../catalog.js';
+  import { TAGS, families, classics, familyForSketch, TABBIED_COUNT, previewUrl } from '../catalog.js';
 
   export let selectedId = '';
   export let activeLookId = '';
   export let base = '';
+  export let libraryOpen = false;
+  export let tabbiedActive = false;
+  export let tabbiedName = '';
 
   const dispatch = createEventDispatcher();
 
@@ -140,11 +137,8 @@
     return blob.includes(needle);
   });
 
-  $: visibleTabbied = tabbiedFamilies.filter((family) => {
-    if (tagFilter !== 'all' && !family.tags.includes(tagFilter)) return false;
-    if (!needle) return true;
-    return [family.label, family.blurb].join(' ').toLowerCase().includes(needle);
-  });
+  $: showTabbied = (tagFilter === 'all' || tagFilter === 'pattern' || tagFilter === 'organic')
+    && (!needle || 'tabbied pattern cell'.includes(needle) || (tabbiedName && tabbiedName.toLowerCase().includes(needle)));
 
   $: visibleClassics = classics.filter((item) => {
     if (tagFilter !== 'all' && !item.tags.includes(tagFilter)) return false;
@@ -158,7 +152,7 @@
   }
 
   function selectFamily(family) {
-    if (selectedFamilyId === family.id) return;
+    if (selectedFamilyId === family.id && !libraryOpen) return;
     dispatch('select', family.variants[0].id);
   }
 </script>

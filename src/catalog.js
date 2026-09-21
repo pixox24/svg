@@ -1,8 +1,24 @@
 import { systems } from './systems.js';
 import { stageFromBg } from './lib/rng.js';
-import { tabbiedFamilies } from './tabbiedCatalog.js';
+import {
+  TABBIED_CATALOG,
+  TABBIED_COUNT,
+  catalogEntry,
+  getTabbiedFamily,
+  slugFromId,
+  tabbiedId,
+  previewUrl
+} from './tabbiedCatalog.js';
 
-export { tabbiedFamilies };
+export {
+  TABBIED_CATALOG,
+  TABBIED_COUNT,
+  catalogEntry,
+  getTabbiedFamily,
+  slugFromId,
+  tabbiedId,
+  previewUrl
+};
 
 function read(input) {
   let temp = input.replace(/^\n+/g, '');
@@ -93,6 +109,75 @@ export const families = [
           opacity: 0.72,
           motion: false,
           speed: 2,
+          seed: 77102
+        }
+      }
+    ]
+  },
+  {
+    id: 'marks',
+    label: 'Marks',
+    blurb: 'One Lucide icon, tiled into a field — turned, recolored, reseeded.',
+    tags: ['mark', 'pattern'],
+    ...systems.marks,
+    variants: [
+      {
+        id: 'marks-star',
+        name: 'Star',
+        params: {
+          icon: 'star',
+          colors: ['#c9a46c', '#8a5a2b', '#161412'],
+          bg: PAPER,
+          grid: 6,
+          frequency: 1,
+          size: 0.58,
+          strokeWidth: 1.8,
+          turn: true,
+          seed: 48291
+        }
+      },
+      {
+        id: 'marks-heart',
+        name: 'Heart',
+        params: {
+          icon: 'heart',
+          colors: ['#c43c6e', '#e08a3c', '#ead3cf'],
+          bg: '#f6f1ea',
+          grid: 5,
+          frequency: 1,
+          size: 0.62,
+          strokeWidth: 1.7,
+          turn: false,
+          seed: 22018
+        }
+      },
+      {
+        id: 'marks-hex',
+        name: 'Hex',
+        params: {
+          icon: 'hexagon',
+          colors: ['#e2b87a', '#7dd3c0'],
+          bg: INK,
+          grid: 7,
+          frequency: 1,
+          size: 0.52,
+          strokeWidth: 1.6,
+          turn: true,
+          seed: 90011
+        }
+      },
+      {
+        id: 'marks-sparkle',
+        name: 'Sparkle',
+        params: {
+          icon: 'sparkle',
+          colors: ['#f2c14e', '#5eead4', '#c4b5fd'],
+          bg: INK,
+          grid: 6,
+          frequency: 0.6,
+          size: 0.48,
+          strokeWidth: 1.9,
+          turn: true,
           seed: 77102
         }
       }
@@ -505,9 +590,26 @@ function sketchFromFamily(family, kind) {
   }));
 }
 
+function stubTabbied(entry) {
+  return {
+    id: tabbiedId(entry.slug),
+    name: entry.name,
+    familyId: tabbiedId(entry.slug),
+    familyLabel: 'Tabbied',
+    blurb: entry.description || '',
+    tags: ['pattern'],
+    kind: 'tabbied',
+    preview: previewUrl(entry.slug),
+    svgExport: entry.svgExport?.supported !== false
+  };
+}
+
 export function allSketches() {
   const gallery = families.flatMap((family) => sketchFromFamily(family, 'gallery'));
-  const tabbied = tabbiedFamilies.flatMap((family) => sketchFromFamily(family, 'tabbied'));
+  const tabbied = TABBIED_CATALOG.map((entry) => {
+    const loaded = getTabbiedFamily(entry.slug);
+    return loaded ? sketchFromFamily(loaded, 'tabbied')[0] : stubTabbied(entry);
+  });
   const classicItems = classics.map((item) => ({
     ...item,
     familyId: null,
@@ -519,19 +621,42 @@ export function allSketches() {
 }
 
 export function getSketch(id) {
-  return allSketches().find((item) => item.id === id) || null;
+  for (const family of families) {
+    if (family.variants.some((item) => item.id === id)) {
+      return sketchFromFamily(family, 'gallery').find((item) => item.id === id);
+    }
+  }
+  const classic = classics.find((item) => item.id === id);
+  if (classic) {
+    return {
+      ...classic,
+      familyId: null,
+      familyLabel: 'Classics',
+      blurb: '',
+      kind: 'classic'
+    };
+  }
+  const slug = slugFromId(id);
+  if (slug) {
+    const loaded = getTabbiedFamily(slug);
+    if (loaded) return sketchFromFamily(loaded, 'tabbied')[0];
+    const entry = catalogEntry(slug);
+    if (entry) return stubTabbied(entry);
+  }
+  return null;
 }
 
 export function getFamily(id) {
   return families.find((item) => item.id === id)
-    || tabbiedFamilies.find((item) => item.id === id)
+    || getTabbiedFamily(slugFromId(id) || '')
     || null;
 }
 
 export function familyForSketch(id) {
-  return families.find((family) => family.variants.some((item) => item.id === id))
-    || tabbiedFamilies.find((family) => family.variants.some((item) => item.id === id))
-    || null;
+  const gallery = families.find((family) => family.variants.some((item) => item.id === id));
+  if (gallery) return gallery;
+  const slug = slugFromId(id);
+  return slug ? getTabbiedFamily(slug) : null;
 }
 
 export const DEFAULT_ID = families[0].variants[0].id;

@@ -13,6 +13,7 @@ let ok = 0;
 let fail = 0;
 
 for (const sketch of allSketches()) {
+  if (!sketch.code || sketch.kind === 'tabbied') continue;
   const dest = path.join(outDir, `${sketch.id}.svg`);
   try {
     let markup = String(svg(sketch.code));

@@ -1,4 +1,5 @@
-import { randomSeed, stageFromBg } from './lib/rng.js';
+import { randomSeed, stageFromBg, evenCells } from './lib/rng.js';
+import { markDoodle } from './lib/marks.js';
 
 function read(input) {
   let temp = input.replace(/^\n+/g, '');
@@ -50,6 +51,61 @@ export const lattice = {
           ${anim}
         }
         ${keyframes}
+      }
+    `);
+  },
+  shuffle(p) {
+    return { ...p, seed: randomSeed() };
+  }
+};
+
+export const marks = {
+  schema: [
+    { key: 'icon', type: 'icon', label: 'Icon' },
+    { key: 'colors', type: 'palette', label: 'Palette', max: 4 },
+    { key: 'bg', type: 'color', label: 'Ground' },
+    { key: 'grid', type: 'range', label: 'Density', min: 3, max: 16, step: 1 },
+    { key: 'frequency', type: 'range', label: 'Frequency', min: 0.05, max: 1, step: 0.05 },
+    { key: 'size', type: 'range', label: 'Scale', min: 0.18, max: 1.2, step: 0.01 },
+    { key: 'strokeWidth', type: 'range', label: 'Stroke', min: 0.6, max: 4, step: 0.1 },
+    { key: 'turn', type: 'toggle', label: 'Turn' }
+  ],
+  compile(p) {
+    const n = p.grid;
+    const pad = Math.max(0.72, (p.size || 0.55) * 0.72);
+    const min = 1 - pad;
+    const span = (n - 1) + pad * 2;
+    const scale = (p.size || 0.55) / 24;
+    const freq = p.frequency ?? 1;
+    const icon = markDoodle(p.icon);
+    const palette = `@pn(${p.colors.join(', ')})`;
+    const cells = evenCells(n, freq, p.seed);
+    const uses = cells.map(([x, y]) => {
+      const turn = p.turn
+        ? ` rotate(${90 * Math.floor(4 * (0.5 + 0.5 * Math.sin(x * 2.11 + y * 1.73 + (Number(p.seed) || 1) * 0.00021)))})`
+        : '';
+      return `use {
+          href: #mark;
+          transform: translate(${x}, ${y})${turn} scale(${scale}) translate(-12, -12);
+          stroke: ${palette};
+          stroke-width: ${p.strokeWidth};
+        }`;
+    }).join('\n        ');
+    return read(`
+      svg {
+        viewBox: ${min} ${min} ${span} ${span};
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        rect {
+          x: ${min}; y: ${min};
+          width: ${span}; height: ${span};
+          fill: ${p.bg};
+        }
+        defs {
+          g { id: mark; ${icon} }
+        }
+        ${uses}
       }
     `);
   },
@@ -476,6 +532,7 @@ export const tide = {
 
 export const systems = {
   lattice,
+  marks,
   crystal,
   textile,
   pebble,
