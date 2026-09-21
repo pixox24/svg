@@ -8,7 +8,7 @@ const config = {
       register: true,
     },
     paths: {
-      base: '/svg',
+      base: '',
     },
   }
 };
