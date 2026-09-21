@@ -4,18 +4,45 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
     <meta name="viewport" content="width=device-width" />
-    <title>SVG playground</title>
+    <title>SVG Playground</title>
     %sveltekit.head%
     <style>
+      :root {
+        --bg: #0c0d10;
+        --bg-elev: #12141a;
+        --bg-elev-2: #181b22;
+        --line: rgba(255, 255, 255, 0.07);
+        --line-strong: rgba(255, 255, 255, 0.12);
+        --text: #eeeae3;
+        --text-dim: #8c8882;
+        --text-faint: #5e5b56;
+        --accent: #c9a46c;
+        --accent-dim: rgba(201, 164, 108, 0.16);
+        --paper: #f2eee6;
+        --ink: #101216;
+        --radius: 10px;
+        --sidebar: 304px;
+        --inspector: minmax(360px, 32%);
+      }
       html, body {
         height: 100%;
       }
       body {
         margin: 0;
-        font-family: sans-serif;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
       }
       * {
         box-sizing: border-box;
+      }
+      button, input, select {
+        font-family: inherit;
+      }
+      ::selection {
+        background: var(--accent-dim);
+        color: var(--text);
       }
     </style>
   </head>

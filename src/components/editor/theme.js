@@ -1,51 +1,51 @@
 import {EditorView} from '@codemirror/view';
 
-const white = '#D5F1FF';
-const dark = '#1b2e37';
+const ivory = '#eeeae3';
+const ink = '#12141a';
 
 export default EditorView.theme({
   "&": {
-    color: white,
-    backgroundColor: dark,
+    color: ivory,
+    backgroundColor: ink,
   },
   ".ͼi": {
-    color: '#11b0ff',
+    color: '#c9a46c',
   },
   ".ͼd": {
-    color: '#e9e91e',
+    color: '#e8d5a3',
   },
   ".ͼc": {
-    color: '#8d7cff',
+    color: '#9bb7d4',
   },
   ".ͼb": {
-    color: '#eb5eff',
+    color: '#d4a0b0',
   },
   ".ͼm": {
-    color: '#66787f',
+    color: '#6a6762',
   },
   ".ͼj": {
-    color: '#8d7cff',
+    color: '#9bb7d4',
   },
   "&.cm-focused .cm-cursor": {
-    borderLeftColor: "yellow"
+    borderLeftColor: '#c9a46c'
   },
   "&.cm-focused .cm-selectionBackground, ::selection": {
-    backgroundColor: '#233b49',
+    backgroundColor: '#2a261f',
   },
   ".cm-selectionBackground": {
-    backgroundColor: '#242D4A',
+    backgroundColor: '#2a261f',
   },
   ".cm-gutters": {
-    backgroundColor: "#1B2D37",
-    color: "#D5F1FF33",
+    backgroundColor: ink,
+    color: '#5e5b56',
     border: "none"
   },
   ".cm-activeLine": {
-    backgroundColor: '#233b49',
+    backgroundColor: '#1a1d24',
   },
   ".cm-activeLineGutter": {
-    color: white,
-    backgroundColor: '#233b49',
+    color: ivory,
+    backgroundColor: '#1a1d24',
   }
 }, {dark: true});
 
