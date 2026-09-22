@@ -627,24 +627,18 @@
     position: relative;
     width: 100%;
     aspect-ratio: var(--ar, 1);
-    border-radius: 3px;
+    border-radius: 14px;
     overflow: hidden;
     background: var(--sheet-bg, var(--paper));
-    box-shadow:
-      0 0 0 1px rgba(0, 0, 0, 0.28),
-      0 1px 1px rgba(0, 0, 0, 0.12),
-      0 24px 48px -18px rgba(0, 0, 0, 0.55);
+    box-shadow: 0 0 0 1px var(--border-subtle);
   }
 
   .sheet.ink {
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.08),
-      0 1px 1px rgba(0, 0, 0, 0.35),
-      0 24px 48px -18px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 0 0 1px var(--border-default);
   }
 
   .sheet.source {
-    background: var(--paper);
+    background: var(--bg-panel);
   }
 
   .print {
@@ -682,8 +676,8 @@
     margin: 0;
     padding: 22px 24px;
     overflow: auto;
-    background: var(--paper);
-    color: #1c1916;
+    background: var(--bg-panel);
+    color: var(--text-primary);
     white-space: pre-wrap;
     user-select: all;
     font-size: 12.5px;
@@ -704,15 +698,15 @@
 
   .family-label {
     margin: 0;
-    font-size: 10px;
-    letter-spacing: 0.18em;
+    font-size: 11px;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--text-faint);
+    color: var(--accent);
   }
 
   .identity h2 {
     margin: 4px 0 0;
-    font-size: 1.05rem;
+    font-size: 1.35rem;
     font-weight: 500;
     letter-spacing: -0.03em;
     overflow: hidden;
@@ -730,45 +724,49 @@
   .view-tabs button {
     margin: 0;
     border: 0;
-    padding: 0 0 3px;
+    padding: 0 0 6px;
     background: transparent;
-    color: var(--text-faint);
-    font-size: 10px;
-    letter-spacing: 0.16em;
+    color: var(--text-muted);
+    font-size: 11px;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     cursor: pointer;
   }
 
+  .view-tabs button:hover {
+    color: var(--text-secondary);
+  }
+
   .view-tabs button.on {
-    color: var(--text);
-    box-shadow: 0 1px 0 var(--accent);
+    color: var(--text-primary);
+    box-shadow: inset 0 -2px 0 var(--accent);
   }
 
   .tabs {
     display: flex;
-    padding: 2px;
-    background: rgba(12, 13, 16, 0.06);
-    border-radius: 999px;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
   }
 
   .tabs button {
     margin: 0;
     border: 0;
     background: transparent;
-    color: inherit;
-    opacity: 0.55;
-    min-width: 4.6em;
-    padding: 6px 10px;
-    border-radius: 999px;
-    font-size: 12px;
+    color: var(--text-muted);
+    opacity: 1;
+    min-width: 0;
+    padding: 4px 0 6px;
+    border-radius: 0;
+    font-size: 13px;
     cursor: pointer;
   }
 
   .tabs button.on {
     opacity: 1;
-    background: #fff;
-    color: #1c1916;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    background: transparent;
+    color: var(--text-primary);
+    box-shadow: inset 0 -2px 0 var(--accent);
   }
 
   .inspector {
@@ -777,9 +775,9 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: var(--bg-elev);
-    border-left: 1px solid var(--line);
-    color: var(--text);
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border-subtle);
+    color: var(--text-primary);
   }
 
   .inspector-bar {
@@ -795,19 +793,9 @@
   .kicker {
     margin: 0;
     font-size: 11px;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--text-dim);
-  }
-
-  .syntax {
-    color: var(--accent);
-    text-decoration: none;
-    font-size: 12px;
-  }
-
-  .syntax:hover {
-    text-decoration: underline;
+    color: var(--text-muted);
   }
 
   .inspector-actions {
@@ -818,24 +806,25 @@
 
   select {
     display: none;
-    background: transparent;
-    color: var(--text);
-    border: 1px solid var(--line-strong);
-    border-radius: 6px;
-    padding: 4px 6px;
+    height: 36px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 4px 8px;
     font-size: 12px;
     max-width: 160px;
   }
 
   .icon-btn {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     display: grid;
     place-items: center;
-    color: var(--text-dim);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 6px;
+    color: var(--text-secondary);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
     cursor: pointer;
     text-decoration: none;
     margin: 0;
@@ -843,8 +832,8 @@
   }
 
   .icon-btn:hover {
-    color: var(--text);
-    background: var(--bg-elev-2);
+    color: var(--text-primary);
+    background: var(--bg-hover);
   }
 
   .editor-body,
@@ -861,50 +850,83 @@
   }
 
   .mode-tabs {
-    background: rgba(255, 255, 255, 0.06);
+    gap: 16px;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  .mode-tabs button {
+    min-width: 0;
+    padding: 4px 0 6px;
+    border-radius: 0;
+    opacity: 1;
+    color: var(--text-muted);
+    background: transparent;
+    font-size: 13px;
+  }
+
+  .mode-tabs button:hover {
+    color: var(--text-secondary);
+    opacity: 1;
   }
 
   .mode-tabs button.on {
-    background: var(--bg-elev-2);
-    color: var(--text);
-    box-shadow: none;
+    background: transparent;
+    color: var(--text-primary);
+    box-shadow: inset 0 -2px 0 var(--accent);
     opacity: 1;
   }
 
   .inspector-foot {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 14px;
-    border-top: 1px solid var(--line);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 14px 16px 16px;
+    border-top: 1px solid var(--border-subtle);
     font-size: 12px;
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
 
   .export {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
+    width: 100%;
   }
 
   .inspector-foot p {
     margin: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.45;
   }
 
   .inspector-foot button {
     margin: 0;
-    background: var(--accent-dim);
-    color: var(--accent);
-    border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 6px 10px;
+    flex: 1 1 auto;
+    min-height: 40px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 8px 10px;
     font-size: 12px;
     cursor: pointer;
     white-space: nowrap;
+  }
+
+  .inspector-foot button:hover {
+    background: var(--bg-hover);
+  }
+
+  .export button:first-child {
+    flex: 1 1 100%;
+    border: 2px solid var(--accent);
+    background: transparent;
+  }
+
+  .export button:first-child:hover {
+    background: var(--accent-muted);
   }
 
   .rail-toggle {
@@ -923,8 +945,8 @@
   }
 
   .rail-toggle:hover {
-    color: var(--text);
-    background: var(--bg-elev-2);
+    color: var(--text-primary);
+    background: var(--bg-hover);
   }
 
   @media screen and (max-width: 67.5em) {

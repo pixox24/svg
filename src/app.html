@@ -8,42 +8,77 @@
     %sveltekit.head%
     <style>
       :root {
-        --bg: #0c0d10;
-        --bg-elev: #12141a;
-        --bg-elev-2: #181b22;
-        --line: rgba(255, 255, 255, 0.07);
-        --line-strong: rgba(255, 255, 255, 0.12);
-        --text: #eeeae3;
-        --text-dim: #8c8882;
-        --text-faint: #5e5b56;
-        --accent: #c9a46c;
-        --accent-dim: rgba(201, 164, 108, 0.16);
+        --bg-app: #0b0b0d;
+        --bg-sidebar: #101012;
+        --bg-panel: #121214;
+        --bg-elevated: #18181b;
+        --bg-input: #161618;
+        --bg-hover: #1c1c20;
+        --bg-active: #222226;
+
+        --border-subtle: #26262b;
+        --border-default: #323238;
+        --border-strong: #3f3f46;
+
+        --text-primary: #f4f4f5;
+        --text-secondary: #a1a1aa;
+        --text-muted: #71717a;
+        --text-inverse: #0b0b0d;
+
+        --accent: #9982f8;
+        --accent-hover: #b09aff;
+        --accent-pressed: #8670e6;
+        --accent-muted: rgba(153, 130, 248, 0.16);
+        --accent-muted-strong: rgba(153, 130, 248, 0.28);
+        --accent-border: #9982f8;
+        --accent-glow: rgba(153, 130, 248, 0.22);
+
+        --danger: #f07178;
+        --success: #7dcea0;
+
+        --bg: var(--bg-app);
+        --bg-elev: var(--bg-elevated);
+        --bg-elev-2: var(--bg-elevated);
+        --line: var(--border-subtle);
+        --line-strong: var(--border-default);
+        --text: var(--text-primary);
+        --text-dim: var(--text-secondary);
+        --text-faint: var(--text-muted);
+        --accent-dim: var(--accent-muted);
+
         --paper: #f2eee6;
         --ink: #101216;
-        --wall: #14131a;
+        --wall: var(--bg-app);
         --radius: 10px;
-        --sidebar: 304px;
-        --inspector: minmax(360px, 32%);
+        --sidebar: 292px;
+        --inspector: 332px;
       }
       html, body {
         height: 100%;
       }
       body {
         margin: 0;
-        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-        background: var(--bg);
-        color: var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", sans-serif;
+        background: var(--bg-app);
+        color: var(--text-primary);
         -webkit-font-smoothing: antialiased;
       }
       * {
         box-sizing: border-box;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-default) transparent;
       }
-      button, input, select {
+      button, input, select, a {
         font-family: inherit;
+        transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+      }
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
       }
       ::selection {
-        background: var(--accent-dim);
-        color: var(--text);
+        background: var(--accent-muted);
+        color: var(--text-primary);
       }
     </style>
   </head>
