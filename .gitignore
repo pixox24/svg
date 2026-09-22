@@ -6,4 +6,5 @@ node_modules
 .env
 .env.*
 !.env.example
-engine-out/refs/
+# 参考图是第三方收集图片，只留在本地，不进仓库（公开仓库）
+spike/engine-out/refs/
