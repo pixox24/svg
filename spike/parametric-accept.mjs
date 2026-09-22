@@ -208,6 +208,45 @@ run('C5 种子可输入 + 命名空间种子不破坏预设识别', () => {
   return '种子可输入（change 提交），且改种子不会掉出预设';
 });
 
+run('C6 参数化预设用参数分享，而不是把编译产物塞进 URL', () => {
+  const s = readFileSync(join(ROOT, 'src/routes/+page.svelte'), 'utf8');
+  // saveToURL 必须对 parametric 走参数分支（否则 URL 会有 1.5 万字符）
+  const save = s.match(/function saveToURL\(\)[\s\S]*?\n  }/);
+  need(save, '找不到 saveToURL');
+  need(/isParametric\s*&&\s*!ejected/.test(save[0]), 'saveToURL 没有 parametric 参数分支');
+  need(/encodeEngineParams\(params\)/.test(save[0]), 'saveToURL 没有编码参数');
+  need(/query\.set\('p'/.test(save[0]), "saveToURL 没有写入 ?p=");
+  // init 必须读取 ?p= 并应用
+  const init = s.match(/function init\(\)[\s\S]*?\n  }/);
+  need(init, '找不到 init');
+  need(/query\.get\('p'\)/.test(init[0]), 'init 没有读取 ?p=');
+  need(/decodeEngineParams\(storedParams\)/.test(init[0]), 'init 没有解码参数');
+  // updateUrl 只能在切换到别的预设时才丢弃 ?p，否则 init 会把自己要恢复的链接删掉
+  const upd = s.match(/function updateUrl\(id\)[\s\S]*?\n  }/);
+  need(upd, '找不到 updateUrl');
+  need(/if\s*\(query\.get\('id'\)\s*!==\s*id\)\s*query\.delete\('p'\)/.test(upd[0]),
+    'updateUrl 无条件删除 ?p（会导致分享链接自我销毁）');
+
+  // 往返：编码后必须能解码回同一组参数，且长度远小于编译产物
+  const out = sh(`node -e "
+    import('./src/lib/parametric/index.js').then(m=>{
+      let worst=0, worstId='', maxRatio=0;
+      for (const pre of m.PRESETS) {
+        const enc=m.encodeParams(pre.params);
+        const back=m.decodeParams(enc);
+        if (JSON.stringify(back)!==JSON.stringify(m.normalize(pre.params))) { console.log('MISMATCH '+pre.id); process.exit(0); }
+        const svgLen=m.generate(pre.params).svg.length;
+        const ratio=enc.length/svgLen;
+        if (ratio>maxRatio){maxRatio=ratio;worstId=pre.id;worst=enc.length;}
+      }
+      console.log(JSON.stringify({maxRatio:+maxRatio.toFixed(3),worstId,worst}));
+    })"`).trim();
+  const r = JSON.parse(out);
+  need(r.maxRatio < 0.2, `参数编码占编译产物的比例过高：${r.maxRatio}（${r.worstId}）`);
+  need(r.maxRatio > 0, '参数编码为空，检查 encodeParams');
+  return `14/14 往返一致，最长编码 ${r.worst} 字符（占编译产物 ${(r.maxRatio * 100).toFixed(1)}%）`;
+});
+
 console.log('\n【D. 构建】');
 run('D1 npm run build 成功', () => {
   let out = '';

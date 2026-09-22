@@ -4,8 +4,8 @@
 |---|---|
 | 日期 | 2026-09-23 |
 | 交付目标 | 在 `~/Desktop/svg`（SVG Playground）中新增参数化图形引擎模块：参数面板 + 实时预览 + 导出 SVG，面向平面/网页设计师，与现有功能联动 |
-| 最终状态 | **已接入并在真实浏览器中验证可用**。验收脚本 17/17，单元测试 68/68，14 个预设与参考图密度 14/14 一致，14/14 侧栏缩略图可辨识 |
-| 代码状态 | 全部已提交（10 个 commit，见文末）|
+| 最终状态 | **已接入并在真实浏览器中验证可用**。验收脚本 18/18，单元测试 68/68，14 个预设与参考图密度 14/14 一致，14/14 侧栏缩略图可辨识 |
+| 代码状态 | 全部已提交（11 个 commit，见文末）|
 
 ---
 
@@ -27,7 +27,7 @@
 | 单元测试（68 断言） | `src/lib/parametric/parametric.test.mjs` |
 | 集成（4 处改动） | `src/systems.js`、`src/catalog.js`、`src/routes/+page.svelte`、`src/components/LookPanel.svelte` |
 | 缩略图生成 | `scripts/generate-thumbs.mjs`（+ 14 张 `static/thumbs/p-*.svg`）|
-| 验收脚本（17 项） | `spike/parametric-accept.mjs` |
+| 验收脚本（18 项） | `spike/parametric-accept.mjs` |
 | 定量体检 | `spike/parametric-audit.mjs`（覆盖率 / 分带走向 / 连通率 / 设计意图断言）|
 | 参考图密度比对 | `spike/ref-density.py` |
 | 参考图对照页 | `spike/parametric-compare.mjs` → `spike/engine-out/compare.html` |
@@ -38,7 +38,7 @@
 
 ## 三、验收结果
 
-### 3.1 验收脚本（`node spike/parametric-accept.mjs` → 17/17）
+### 3.1 验收脚本（`node spike/parametric-accept.mjs` → 18/18）
 
 ```
 【A. 引擎核心】
@@ -60,6 +60,7 @@
   PASS  C3 +page.svelte 有 parametric 渲染分支
   PASS  C4 LookPanel 兼容 {value,label} 的 select  两种选项形式都受支持
   PASS  C5 种子可输入 + 命名空间种子不破坏预设识别
+  PASS  C6 参数化预设用参数分享，而非把编译产物塞进 URL   14/14 往返一致，最长 527 字符（占 9.8%）
 
 【D. 构建】
   PASS  D1 npm run build 成功                    无错误
@@ -109,6 +110,7 @@
 | 改种子 → 复现 | ✅ 种子 7123 → 31337，迷宫重绘（280 → 292 段），**标题保持预设名不掉成 Custom** |
 | PNG 导出（栅格化） | ✅ 1024×1024，681 KB，采样像素全部不透明（非空白）|
 | **侧栏缩略图可辨识度** | ✅ **14/14 张在真实显示尺寸下都能辨识为不同图案**（此项曾 13/14，已修，见 5.1 #12）|
+| **分享链接（参数往返）** | ✅ 链接 **450 字符**（原 14,874）；重新加载后参数完整还原（列数 13→20 保留），渲染结果与 Node 用同一组参数生成**逐元素一致**（见 5.1 #14）|
 | 构建产物 | ✅ `build/index.html` 含 family 与缩略图引用 |
 
 截图证据：
@@ -153,10 +155,29 @@
 | 11 | 种子只读，无法输入复现 | LookPanel 的 seed 分支只渲染 `<code>`（该分支在项目中从未被使用）| 浏览器实测 |
 | 12 | 侧栏里等轴测迷宫糊成一块深色，看不出是什么 | 墨量虽与参考图一致（48.5%），但 12 列 × 19px 线宽 × 38px 段长，缩小后细节全部消失 | **按缩略图真实显示尺寸验收** |
 | 13 | **14 张第三方参考图被误提交进公开仓库**（2.1MB）| `.gitignore` 规则写成 `engine-out/refs/`，从仓库根算起匹配不到 `spike/engine-out/refs/`；随后 `git add -A spike` 把它们全扫进去了 | 提交后自查 `git ls-files` |
+| 14 | `Save URL` 生成 **14,874 字符**的链接，发出去必被截断 | 页面的 `saveToURL()` 把整个 `code` 塞进 `?code=`；对 parametric 而言 `code` 是完整 SVG 文档（约 15KB）。而 css-doodle 系的 `code` 只有几百字符，所以这个设计原本没问题 | 主动排查 PRD 的 A9 要求时实测 |
 
 **关于 #13**：这个仓库是公开的（README 指向 GitHub），而参考图是华子从网上收集的第三方图片，提交进去有版权问题。**已用 `git filter-repo` 从历史中彻底清除**——当时 11 个 commit 全部未推送，所以不影响任何其他人，也不需要 force-push。修正后的规则按仓库相对路径锚定为 `spike/engine-out/refs/`，并加了注释说明原因；图片保留在本地磁盘（对照页照常可用），`git status` 确认已被忽略。重写后重新验证：68/68 测试、6/6 断言、14/14 密度对齐均不受影响。
 
 > 注：仓库里留了一个 `backup-before-purge` 分支（历史重写前所建，重写时被一并改写，已无实际备份作用）。删除它属于破坏性操作，我没有代为执行——华子可自行 `git branch -D backup-before-purge`。
+
+#### ⚠️ 历史重写对远端的影响（需要知道的一件事）
+
+`git filter-repo` 重写了整个历史，**包括原本就有的提交的哈希**。具体表现：
+
+- 华子原来的最后一个提交 `829daca`（远端 `main` 的 tip）现在在本地叫 `42d8f90`，内容**完全一致**
+- 因此本地 `main` 与远端 `main` 不再共享任何提交哈希 → **普通 `git push` 会被拒**（non-fast-forward）
+- 当前本地共 154 个 commit，其中 12 个是本次新增，干净地叠在华子原有工作之上
+
+**内容没有任何丢失**，只是哈希变了。如果要把本地推到远端（`github.com/pixox24/svg`，是华子自己的 fork），用：
+
+```bash
+git push --force-with-lease origin main
+```
+
+因为这是自己的 fork 且远端没有其他人的提交基于它，force-push 是安全的。**不推也完全没问题**——纯本地开发不受影响。
+
+另外远端跟踪引用（`origin/main`）在重写时被清掉了，下次 `git fetch` 会自动恢复，这是正常现象。
 
 **关于 #12**：这是唯一一个"数字全对但产品不可用"的问题——覆盖率、断言、测试全绿，但设计师在侧栏里根本认不出这个预设。修法体现了一个重要区别：**覆盖率对尺度近似不变，但特征尺寸会变**。所以把纹样放大（列数 12→7、段长 38→66px）并相应收细线宽（33→25px）以维持密度——结果 49.6% 覆盖率（与参考图差 1.1pp）配双倍特征尺寸，小尺寸下结构得以存活。
 
@@ -198,7 +219,7 @@ npm run dev            # 打开 http://localhost:5173
 
 验证命令：
 ```bash
-node spike/parametric-accept.mjs                        # 17 项验收
+node spike/parametric-accept.mjs                        # 18 项验收
 node --test src/lib/parametric/parametric.test.mjs       # 68 个单元测试
 node spike/parametric-audit.mjs                          # 覆盖率 + 设计意图断言
 uv run --with pillow python3 spike/ref-density.py        # 与参考图的密度比对
