@@ -121,20 +121,21 @@ export function randomize(input, seed, lockedKeys = []) {
   if (out['shape.stroke'] && (out['shape.strokeWidth'] || 0) < 1) {
     out['shape.strokeWidth'] = between(2, 26);
   }
-  // 5) 单元预算：点/格太少的组合会产出"只有两三个元素"的空画面
+  // 5) 单元预算：点/格太少的组合会产出"只有几个元素"的空画面。
+  //    阈值定得比"不空白"更严一些 —— 随机的下限应该是"一眼能看出是图案"。
   const lt = out['lattice.type'];
   if (['grid', 'hex', 'iso', 'oblique'].includes(lt)) {
-    out['lattice.cols'] = Math.max(4, out['lattice.cols']);
-    out['lattice.rows'] = Math.max(4, out['lattice.rows']);
-    if (out['lattice.cols'] * out['lattice.rows'] < 48) out['lattice.rows'] = Math.ceil(48 / out['lattice.cols']);
-  } else if (lt === 'ring') {
+    out['lattice.cols'] = Math.max(5, out['lattice.cols']);
     out['lattice.rows'] = Math.max(5, out['lattice.rows']);
-    out['lattice.count'] = Math.max(160, out['lattice.count']);
+    if (out['lattice.cols'] * out['lattice.rows'] < 80) out['lattice.rows'] = Math.ceil(80 / out['lattice.cols']);
+  } else if (lt === 'ring') {
+    out['lattice.rows'] = Math.max(6, out['lattice.rows']);
+    out['lattice.count'] = Math.max(240, out['lattice.count']);
   } else if (lt === 'cluster') {
-    out['lattice.cols'] = Math.max(3, out['lattice.cols']);
-    out['lattice.rows'] = Math.max(4, out['lattice.rows']);
+    out['lattice.cols'] = Math.max(4, out['lattice.cols']);
+    out['lattice.rows'] = Math.max(5, out['lattice.rows']);
   } else if (lt === 'phyllotaxis' || lt === 'spiral') {
-    out['lattice.count'] = Math.max(180, out['lattice.count']);
+    out['lattice.count'] = Math.max(260, out['lattice.count']);
   }
   out['modulator.seed'] = Math.floor(rand() * 99999);
   return normalize(out);

@@ -22,7 +22,8 @@ export function apply(cells, p, ctx) {
   const jitter = clampNum(p['topology.jitter'], 0, 1);
   const warp = clampNum(p['topology.warp'], 0, 1);
   const density = clampNum(p['topology.density'], 0, 1);
-  const seed = Math.round(clampNum(p['modulator.seed'], 0, 9999));
+  // Schema seeds span 0..99999; a 9999 cap aliased every larger seed together.
+  const seed = Math.round(clampNum(p['modulator.seed'], 0, 99999));
 
   let work = cells;
   if (jitter > 0) work = work.map((c) => jitterCell(c, jitter, seed));
@@ -72,7 +73,8 @@ function plain(cells, p, ctx, seed) {
 
 /** 半调：把调制值量化成 N 级，产生印刷网点感 */
 function halftone(cells, p, ctx, seed) {
-  const levels = Math.max(2, Math.round(lerp(2, 8, clampNum(p['shape.halftoneLevels'] ?? 0.5, 0, 1))));
+  // Schema key is topology.halftoneLevels; shape.halftoneLevels is not a parameter.
+  const levels = Math.max(2, Math.round(lerp(2, 8, clampNum(p['topology.halftoneLevels'] ?? 0.5, 0, 1))));
   const out = [];
   for (const c of cells) {
     const m = evaluate(c, p);

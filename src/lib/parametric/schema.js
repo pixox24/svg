@@ -205,7 +205,14 @@ export function normalize(input) {
     }
   }
   // palette[0] 必须与 bg 保持一致：stageFromBg() 与 frameBg 都依赖它
-  if (Array.isArray(p.palette)) p.bg = p.palette[0];
+  // An empty palette[0] used to reset bg to paper while leaving the swatch blank.
+  if (Array.isArray(p.palette)) {
+    if (typeof p.palette[0] !== 'string' || !p.palette[0]) {
+      const accent = p.palette.length > 2 ? p.palette[2] : '';
+      p.palette = [PAPER, p.palette[1] || INK, accent];
+    }
+    p.bg = p.palette[0];
+  }
   if (typeof p.bg !== 'string' || !p.bg) p.bg = PAPER;
   return p;
 }

@@ -29,7 +29,8 @@ export function evaluate(cell, p) {
   const amp = clampNum(p['modulator.amp'], 0, 2);
   const phase = clampNum(p['modulator.phase'], 0, 1);
   const bias = clampNum(p['modulator.bias'], 0, 1);
-  const seed = Math.round(clampNum(p['modulator.seed'], 0, 9999));
+  // Schema seeds span 0..99999; a 9999 cap aliased every larger seed together.
+  const seed = Math.round(clampNum(p['modulator.seed'], 0, 99999));
 
   const t = axisValue(cell, axis);
   let m;
