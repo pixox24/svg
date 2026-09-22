@@ -107,15 +107,15 @@
 
   .family-label {
     margin: 0;
-    font-size: 10px;
-    letter-spacing: 0.18em;
+    font-size: 11px;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--text-faint);
+    color: var(--accent);
   }
 
   h2 {
     margin: 4px 0 0;
-    font-size: 1.05rem;
+    font-size: 1.35rem;
     font-weight: 500;
     letter-spacing: -0.03em;
   }
@@ -147,21 +147,23 @@
   .search input {
     width: 100%;
     max-width: 360px;
-    background: var(--bg-elev);
-    border: 1px solid var(--line);
-    color: var(--text);
-    border-radius: 8px;
-    padding: 8px 10px;
+    height: 38px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: 9px;
+    padding: 8px 12px;
     font-size: 13px;
     outline: none;
   }
 
   .search input::placeholder {
-    color: var(--text-faint);
+    color: var(--text-muted);
   }
 
   .search input:focus {
     border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
   }
 
   .pills {
@@ -172,19 +174,24 @@
 
   .pills button {
     margin: 0;
-    border: 1px solid var(--line);
+    border: 1px solid var(--border-subtle);
     background: transparent;
-    color: var(--text-dim);
+    color: var(--text-secondary);
     font-size: 11px;
     letter-spacing: 0.02em;
-    padding: 4px 8px;
+    padding: 5px 10px;
+    min-height: 28px;
     border-radius: 999px;
     cursor: pointer;
     text-transform: capitalize;
   }
 
+  .pills button:hover:not(.on) {
+    background: var(--bg-hover);
+  }
+
   .pills button.on {
-    color: var(--bg);
+    color: var(--text-inverse);
     background: var(--accent);
     border-color: var(--accent);
   }
@@ -198,7 +205,6 @@
     gap: 14px 12px;
     align-content: start;
     padding-bottom: 12px;
-    scrollbar-color: #fff2 transparent;
   }
 
   .tile {
@@ -214,18 +220,14 @@
   .print {
     display: block;
     aspect-ratio: 2 / 3;
-    border-radius: 3px;
+    border-radius: 12px;
     overflow: hidden;
-    background: var(--paper);
-    box-shadow:
-      0 0 0 1px rgba(0, 0, 0, 0.28),
-      0 10px 22px -14px rgba(0, 0, 0, 0.55);
+    background: var(--bg-active);
+    box-shadow: 0 0 0 1px var(--border-subtle);
   }
 
   .tile.on .print {
-    box-shadow:
-      0 0 0 1.5px var(--accent),
-      0 10px 22px -14px rgba(0, 0, 0, 0.55);
+    box-shadow: 0 0 0 2px var(--accent);
   }
 
   .print img {

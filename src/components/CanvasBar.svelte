@@ -173,11 +173,12 @@
     gap: 6px;
     min-width: 0;
     flex: 1;
+    height: 34px;
     margin: 0;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-elev-2);
-    color: var(--text);
-    border-radius: 6px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    border-radius: 8px;
     padding: 6px 10px;
     font-size: 12px;
     cursor: pointer;
@@ -185,6 +186,7 @@
 
   .pill.on {
     border-color: var(--accent);
+    background: var(--accent-muted);
   }
 
   .pill-text {
@@ -200,20 +202,20 @@
 
   .orient {
     margin: 0;
-    width: 28px;
-    height: 28px;
+    width: 34px;
+    height: 34px;
     flex-shrink: 0;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-elev-2);
-    color: var(--text-dim);
-    border-radius: 6px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border-radius: 8px;
     font-size: 12px;
     cursor: pointer;
   }
 
   .orient.on {
-    background: var(--accent);
-    color: var(--bg);
+    background: var(--accent-muted);
+    color: var(--accent);
     border-color: var(--accent);
   }
 
@@ -224,20 +226,21 @@
 
   .fit-btn {
     margin: 0;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-elev-2);
-    color: var(--text-dim);
+    height: 34px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
     padding: 6px 8px;
     font-size: 11px;
     cursor: pointer;
   }
 
   .fit-btn:first-child {
-    border-radius: 6px 0 0 6px;
+    border-radius: 8px 0 0 8px;
   }
 
   .fit-btn:last-child {
-    border-radius: 0 6px 6px 0;
+    border-radius: 0 8px 8px 0;
   }
 
   .fit-btn + .fit-btn {
@@ -245,7 +248,9 @@
   }
 
   .fit-btn.on {
-    background: var(--accent-dim);
+    position: relative;
+    z-index: 1;
+    background: var(--accent-muted);
     color: var(--accent);
     border-color: var(--accent);
   }
@@ -263,14 +268,13 @@
 
   .panel {
     position: absolute;
-    top: 100%;
+    top: calc(100% - 2px);
     left: 0;
     z-index: 41;
     width: min(380px, 92vw);
-    background: var(--bg-elev-2);
-    border: 1px solid var(--line-strong);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
     border-radius: 10px;
-    box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
     padding: 10px;
   }
 
@@ -283,18 +287,23 @@
 
   .cat {
     margin: 0;
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--border-subtle);
     background: transparent;
-    color: var(--text-dim);
+    color: var(--text-secondary);
     border-radius: 999px;
-    padding: 4px 10px;
+    padding: 5px 10px;
+    min-height: 28px;
     font-size: 11px;
     cursor: pointer;
   }
 
+  .cat:hover:not(.on) {
+    background: var(--bg-hover);
+  }
+
   .cat.on {
     background: var(--accent);
-    color: var(--bg);
+    color: var(--text-inverse);
     border-color: var(--accent);
   }
 
@@ -323,11 +332,11 @@
   }
 
   .row:hover {
-    background: var(--bg-elev);
+    background: var(--bg-hover);
   }
 
   .row.on {
-    background: var(--accent-dim);
+    background: var(--accent-muted);
     color: var(--accent);
   }
 
@@ -358,13 +367,20 @@
   .custom input,
   .custom select {
     width: 84px;
-    background: var(--bg);
-    border: 1px solid var(--line-strong);
-    color: var(--text);
-    border-radius: 6px;
+    height: 36px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: 8px;
     padding: 6px 8px;
     font-size: 12px;
     outline: none;
+  }
+
+  .custom input:focus,
+  .custom select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
   }
 
   .custom .unit input,
@@ -400,7 +416,7 @@
 
   .dpi-btn.on {
     background: var(--accent);
-    color: var(--bg);
+    color: var(--text-inverse);
     border-color: var(--accent);
   }
 

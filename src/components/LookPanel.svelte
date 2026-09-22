@@ -76,6 +76,7 @@
             max={field.max}
             step={field.step}
             value={params[field.key]}
+            style="--pct: {rangePct(params[field.key], field)}"
             on:input={(e) => set(field.key, Number(e.target.value))}
           />
         {:else if field.type === 'toggle'}
@@ -335,14 +336,21 @@
     if (step >= 0.01) return value.toFixed(2);
     return String(value);
   }
+
+  function rangePct(value, field) {
+    const span = Number(field.max) - Number(field.min);
+    if (!span) return '0%';
+    const t = (Number(value) - Number(field.min)) / span;
+    return `${Math.min(100, Math.max(0, t * 100))}%`;
+  }
 </script>
 
 <style>
   .look {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 14px 16px 18px;
+    gap: 18px;
+    padding: 18px 18px 20px;
     min-height: 0;
   }
 
@@ -357,8 +365,9 @@
     justify-content: space-between;
     gap: 10px;
     padding: 10px 12px;
-    background: var(--accent-dim);
-    border-radius: 8px;
+    background: var(--accent-muted);
+    border: 1px solid var(--accent-border);
+    border-radius: 10px;
   }
 
   .banner p {
@@ -373,20 +382,27 @@
   .none-on,
   .toggle {
     margin: 0;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-elev-2);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 6px 10px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    border-radius: 999px;
+    padding: 6px 12px;
     font-size: 12px;
     cursor: pointer;
   }
 
   .shuffle {
-    background: var(--accent-dim);
-    color: var(--accent);
-    border-color: transparent;
+    background: transparent;
+    color: var(--text-primary);
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    min-height: 36px;
+    padding: 8px 14px;
     letter-spacing: 0.02em;
+  }
+
+  .shuffle:hover:not(:disabled) {
+    background: var(--accent-muted);
   }
 
   .shuffle:disabled {
@@ -410,21 +426,28 @@
   .fields {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 18px;
   }
 
   .label-row {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: 8px;
     font-size: 12px;
-    color: var(--text-dim);
-    margin-bottom: 6px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
   }
 
   .value {
-    color: var(--text);
+    color: var(--text-primary);
     font-variant-numeric: tabular-nums;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 12px;
+    line-height: 1.4;
   }
 
   .swatches,
@@ -435,27 +458,74 @@
   }
 
   .swatch {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     border-radius: 999px;
     overflow: hidden;
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--border-default);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
     cursor: pointer;
     display: block;
   }
 
+  .swatch:focus-within {
+    box-shadow: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent);
+  }
+
   .swatch input {
     opacity: 0;
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     cursor: pointer;
     transform: scale(1.4);
   }
 
   input[type='range'] {
+    -webkit-appearance: none;
+    appearance: none;
     width: 100%;
-    accent-color: var(--accent);
+    height: 14px;
+    margin: 2px 0 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  input[type='range']::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent) var(--pct, 0%), var(--border-default) var(--pct, 0%));
+  }
+
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--accent);
+  }
+
+  input[type='range']::-moz-range-track {
+    height: 4px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--border-default);
+  }
+
+  input[type='range']::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--accent);
+  }
+
+  input[type='range']::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--accent);
   }
 
   .pills {
@@ -466,19 +536,35 @@
 
   .pill {
     margin: 0;
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--border-subtle);
     background: transparent;
-    color: var(--text-dim);
+    color: var(--text-secondary);
     border-radius: 999px;
-    padding: 4px 8px;
+    padding: 5px 10px;
+    min-height: 28px;
     font-size: 11px;
     cursor: pointer;
   }
 
-  .pill.on,
+  .pill:hover:not(.on) {
+    background: var(--bg-hover);
+  }
+
+  .pill.on {
+    background: var(--accent-muted);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .toggle {
+    min-width: 52px;
+    background: var(--bg-active);
+    color: var(--text-secondary);
+  }
+
   .toggle.on {
     background: var(--accent);
-    color: var(--bg);
+    color: var(--text-inverse);
     border-color: var(--accent);
   }
 
@@ -515,11 +601,12 @@
 
   .icon-picker input[type='search'] {
     width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 6px 8px;
+    height: 36px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 6px 10px;
     font-size: 12px;
     outline: none;
     margin-bottom: 8px;
@@ -527,12 +614,13 @@
 
   .icon-picker input[type='search']:focus {
     border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
   }
 
   .icon-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
+    gap: 8px;
   }
 
   .mark-cell {
@@ -562,10 +650,10 @@
     display: grid;
     place-items: center;
     padding: 6px;
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--text);
-    border-radius: 6px;
+    border: 1.5px solid var(--border-subtle);
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    border-radius: 10px;
     cursor: pointer;
   }
 
@@ -576,8 +664,8 @@
   }
 
   .mark-btn.on {
-    color: var(--bg);
-    background: var(--accent);
+    color: var(--accent);
+    background: var(--accent-muted);
     border-color: var(--accent);
   }
 
