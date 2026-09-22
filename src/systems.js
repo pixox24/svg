@@ -1,5 +1,5 @@
-import { randomSeed, stageFromBg, evenCells } from './lib/rng.js';
-import { markDoodle } from './lib/marks.js';
+import { randomSeed, stageFromBg, evenCells, mulberry32 } from './lib/rng.js';
+import { markDoodle, markPaint } from './lib/marks.js';
 
 function read(input) {
   let temp = input.replace(/^\n+/g, '');
@@ -11,53 +11,7 @@ function read(input) {
 
 const INK = '#101216';
 const PAPER = '#f2eee6';
-
-export const lattice = {
-  schema: [
-    { key: 'colors', type: 'palette', label: 'Palette', max: 4 },
-    { key: 'bg', type: 'color', label: 'Ground' },
-    { key: 'grid', type: 'range', label: 'Density', min: 6, max: 16, step: 1 },
-    { key: 'rMin', type: 'range', label: 'Min radius', min: 0.02, max: 0.8, step: 0.01 },
-    { key: 'rMax', type: 'range', label: 'Max radius', min: 0.04, max: 1.2, step: 0.01 },
-    { key: 'strokeWidth', type: 'range', label: 'Stroke', min: 0, max: 0.12, step: 0.005 },
-    { key: 'opacity', type: 'range', label: 'Opacity', min: 0.35, max: 1, step: 0.01 },
-    { key: 'motion', type: 'toggle', label: 'Motion' },
-    { key: 'speed', type: 'range', label: 'Speed', min: 0.8, max: 4, step: 0.1, showIf: (p) => p.motion }
-  ],
-  compile(p) {
-    const n = p.grid;
-    const lo = Math.min(p.rMin, p.rMax);
-    const hi = Math.max(p.rMin, p.rMax);
-    const pad = Math.max(hi, 0.5);
-    const min = 1 - pad;
-    const size = (n - 1) + pad * 2;
-    const stroke = p.strokeWidth > 0
-      ? `stroke: #1c1916; stroke-width: ${p.strokeWidth};`
-      : 'stroke: none;';
-    const anim = p.motion
-      ? `style animation: scale ${p.speed}s reverse;`
-      : '';
-    const keyframes = p.motion ? `style { @keyframes scale { to { r: 0 } } }` : '';
-    return read(`
-      svg {
-        viewBox: ${min} ${min} ${size} ${size};
-        ${stroke}
-        rect { x: ${min}; y: ${min}; width: ${size}; height: ${size}; fill: ${p.bg}; }
-        circle*${n}x${n} {
-          fill: @pn(${p.colors.join(', ')});
-          fill-opacity: ${p.opacity};
-          cx, cy: @nx, @ny;
-          r: $(${lo} + (${hi} - ${lo}) * (0.5 + 0.5 * sin(@nx * 1.73 + @ny * 2.11 + ${p.seed} * 0.00021)));
-          ${anim}
-        }
-        ${keyframes}
-      }
-    `);
-  },
-  shuffle(p) {
-    return { ...p, seed: randomSeed() };
-  }
-};
+const MARK_STROKE_REF = 0.55;
 
 export const marks = {
   schema: [
@@ -66,31 +20,53 @@ export const marks = {
     { key: 'bg', type: 'color', label: 'Ground' },
     { key: 'grid', type: 'range', label: 'Density', min: 3, max: 16, step: 1 },
     { key: 'frequency', type: 'range', label: 'Frequency', min: 0.05, max: 1, step: 0.05 },
-    { key: 'size', type: 'range', label: 'Scale', min: 0.18, max: 1.2, step: 0.01 },
-    { key: 'strokeWidth', type: 'range', label: 'Stroke', min: 0.6, max: 4, step: 0.1 },
-    { key: 'turn', type: 'toggle', label: 'Turn' }
+    { key: 'sizeMin', type: 'range', label: 'Min scale', min: 0.18, max: 1.2, step: 0.01 },
+    { key: 'sizeMax', type: 'range', label: 'Max scale', min: 0.18, max: 1.2, step: 0.01 },
+    { key: 'opacity', type: 'range', label: 'Opacity', min: 0.35, max: 1, step: 0.01 },
+    { key: 'strokeWidth', type: 'range', label: 'Stroke', min: 0.6, max: 4, step: 0.1, showIf: (p) => markPaint(p.icon) !== 'fill' },
+    { key: 'fill', type: 'toggle', label: 'Fill', showIf: (p) => markPaint(p.icon) !== 'fill' },
+    { key: 'turn', type: 'toggle', label: 'Turn' },
+    { key: 'motion', type: 'toggle', label: 'Motion' },
+    { key: 'speed', type: 'range', label: 'Speed', min: 0.8, max: 4, step: 0.1, showIf: (p) => p.motion }
   ],
   compile(p) {
     const n = p.grid;
-    const pad = Math.max(0.72, (p.size || 0.55) * 0.72);
+    const sizeMin = p.sizeMin ?? 0.55;
+    const sizeMax = p.sizeMax ?? 0.55;
+    const lo = Math.min(sizeMin, sizeMax);
+    const hi = Math.max(sizeMin, sizeMax);
+    const pad = Math.max(0.72, hi * 0.72);
     const min = 1 - pad;
     const span = (n - 1) + pad * 2;
-    const scale = (p.size || 0.55) / 24;
     const freq = p.frequency ?? 1;
+    const opacity = p.opacity ?? 1;
     const icon = markDoodle(p.icon);
-    const palette = `@pn(${p.colors.join(', ')})`;
+    const filled = markPaint(p.icon) === 'fill';
+    const colors = p.colors && p.colors.length ? p.colors : [INK];
     const cells = evenCells(n, freq, p.seed);
+    const seed = Number(p.seed) || 1;
+    const anim = p.motion ? `style animation: mark-fade ${p.speed ?? 2}s reverse;` : '';
     const uses = cells.map(([x, y]) => {
+      const jitter = 0.5 + 0.5 * Math.sin(x * 1.31 + y * 2.63 + seed * 0.00037);
+      const size = lo + (hi - lo) * jitter;
+      const scale = +(size / 24).toFixed(5);
+      const rand = mulberry32((seed ^ Math.imul(x, 0x9e3779b1) ^ Math.imul(y, 0x85ebca6b)) >>> 0);
+      const color = colors[Math.floor(rand() * colors.length)] || colors[0];
       const turn = p.turn
-        ? ` rotate(${90 * Math.floor(4 * (0.5 + 0.5 * Math.sin(x * 2.11 + y * 1.73 + (Number(p.seed) || 1) * 0.00021)))})`
+        ? ` rotate(${90 * Math.floor(4 * (0.5 + 0.5 * Math.sin(x * 2.11 + y * 1.73 + seed * 0.00021)))})`
         : '';
+      const paint = filled
+        ? `fill: ${color}; stroke: none;`
+        : `stroke: ${color}; stroke-width: ${+(p.strokeWidth * MARK_STROKE_REF / size).toFixed(3)};${p.fill ? ` fill: ${color};` : ''}`;
       return `use {
           href: #mark;
           transform: translate(${x}, ${y})${turn} scale(${scale}) translate(-12, -12);
-          stroke: ${palette};
-          stroke-width: ${p.strokeWidth};
+          opacity: ${opacity};
+          ${paint}
+          ${anim}
         }`;
     }).join('\n        ');
+    const keyframes = p.motion ? `style { @keyframes mark-fade { to { opacity: 0 } } }` : '';
     return read(`
       svg {
         viewBox: ${min} ${min} ${span} ${span};
@@ -106,6 +82,7 @@ export const marks = {
           g { id: mark; ${icon} }
         }
         ${uses}
+        ${keyframes}
       }
     `);
   },
@@ -531,7 +508,6 @@ export const tide = {
 };
 
 export const systems = {
-  lattice,
   marks,
   crystal,
   textile,

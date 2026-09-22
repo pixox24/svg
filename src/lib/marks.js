@@ -1,4 +1,5 @@
 import { lucideDynamicIconImports, lucideIconNames } from '@lucide/icons/dynamic';
+import { FILLED_INDEX, FILLED_SHELF } from './tablerFilled.js';
 import Star from '@lucide/icons/icons/star';
 import Heart from '@lucide/icons/icons/heart';
 import Hexagon from '@lucide/icons/icons/hexagon';
@@ -33,6 +34,8 @@ function entry(data, tags) {
     id,
     name: label(id),
     tags: tags || [],
+    paint: 'stroke',
+    source: 'lucide',
     data: icon
   };
 }
@@ -64,35 +67,112 @@ export const MARKS = [
   entry(Snowflake, ['snowflake', 'winter'])
 ];
 
+function filledMark(name, node, tags) {
+  return {
+    id: `filled:${name}`,
+    name: label(name),
+    tags: tags || [],
+    paint: 'fill',
+    source: 'tabler',
+    data: { name, node }
+  };
+}
+
+export const FILLED_MARKS = FILLED_SHELF.map((item) => filledMark(item.name, item.node, item.tags));
+
 const byId = Object.fromEntries(MARKS.map((item) => [item.id, item]));
+for (let i = 0; i < FILLED_MARKS.length; i++) byId[FILLED_MARKS[i].id] = FILLED_MARKS[i];
+
+const filledNames = new Set(FILLED_INDEX.map((item) => item[0]));
 const pending = new Map();
+let filledNodesPromise;
+
+export function markPaint(id) {
+  return String(id || '').startsWith('filled:') ? 'fill' : 'stroke';
+}
 
 export function getMark(id) {
   return byId[id] || byId.star;
 }
 
-export function searchIconNames(query) {
+function scoreName(id, words, needle) {
+  if (id === needle || words === needle) return 0;
+  if (id.startsWith(needle) || words.startsWith(needle)) return 1;
+  if (id.includes(needle) || words.includes(needle)) return 2;
+  return -1;
+}
+
+function takeMixed(scored) {
+  const bands = new Map();
+  for (let i = 0; i < scored.length; i++) {
+    const item = scored[i];
+    let band = bands.get(item.score);
+    if (!band) {
+      band = [];
+      bands.set(item.score, band);
+    }
+    band.push(item);
+  }
+  const scores = [...bands.keys()].sort((a, b) => a - b);
+  const seen = new Set();
+  const out = [];
+  const push = (item) => {
+    if (!item || seen.has(item.id) || out.length >= 48) return;
+    seen.add(item.id);
+    out.push(item.id);
+  };
+  for (let s = 0; s < scores.length; s++) {
+    const band = bands.get(scores[s]);
+    const primary = [];
+    const secondary = [];
+    for (let i = 0; i < band.length; i++) {
+      if (band[i].bias === 0) primary.push(band[i]);
+      else secondary.push(band[i]);
+    }
+    const n = Math.max(primary.length, secondary.length);
+    for (let i = 0; i < n; i++) {
+      push(primary[i]);
+      push(secondary[i]);
+      if (out.length >= 48) return out;
+    }
+  }
+  return out;
+}
+
+export function searchIconNames(query, prefer = 'line') {
   const needle = String(query || '').trim().toLowerCase();
-  if (!needle) return MARKS.map((item) => item.id);
+  if (!needle) {
+    const shelf = prefer === 'solid' ? FILLED_MARKS : MARKS;
+    return shelf.map((item) => item.id);
+  }
+  const lineBias = prefer === 'solid' ? 1 : 0;
+  const fillBias = prefer === 'solid' ? 0 : 1;
   const scored = [];
   for (let i = 0; i < lucideIconNames.length; i++) {
     const id = lucideIconNames[i];
     const words = id.replace(/-/g, ' ');
-    if (id === needle || words === needle) scored.push([0, id]);
-    else if (id.startsWith(needle) || words.startsWith(needle)) scored.push([1, id]);
-    else if (id.includes(needle) || words.includes(needle)) scored.push([2, id]);
+    const score = scoreName(id, words, needle);
+    if (score >= 0) scored.push({ score, bias: lineBias, id });
   }
-  scored.sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : 1));
-  const seen = new Set();
-  const out = [];
-  for (let i = 0; i < scored.length; i++) {
-    const id = scored[i][1];
-    if (seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-    if (out.length >= 48) break;
+  for (let i = 0; i < FILLED_INDEX.length; i++) {
+    const name = FILLED_INDEX[i][0];
+    const tags = FILLED_INDEX[i][1] || '';
+    const words = name.replace(/-/g, ' ');
+    let score = scoreName(name, words, needle);
+    if (score < 0 && needle.length >= 2) {
+      const parts = tags.split(' ');
+      for (let t = 0; t < parts.length; t++) {
+        if (parts[t] === needle) {
+          score = 1;
+          break;
+        }
+        if (score < 0 && parts[t].startsWith(needle)) score = 2;
+      }
+    }
+    if (score >= 0) scored.push({ score, bias: fillBias, id: `filled:${name}` });
   }
-  return out;
+  scored.sort((a, b) => a.score - b.score || a.bias - b.bias || (a.id < b.id ? -1 : 1));
+  return takeMixed(scored);
 }
 
 export function searchMarks(query) {
@@ -104,9 +184,17 @@ export function searchMarks(query) {
   });
 }
 
+function loadFilledNodes() {
+  if (!filledNodesPromise) {
+    filledNodesPromise = import('./tablerFilledNodes.json').then((mod) => mod.default || mod);
+  }
+  return filledNodesPromise;
+}
+
 export function ensureMark(id) {
   const hit = byId[id];
   if (hit) return Promise.resolve(hit);
+  if (String(id).startsWith('filled:')) return ensureFilled(id);
   const loader = lucideDynamicIconImports[id];
   if (!loader) return Promise.resolve(byId.star);
   const inflight = pending.get(id);
@@ -120,6 +208,26 @@ export function ensureMark(id) {
   }).catch(() => {
     pending.delete(id);
     return byId.star;
+  });
+  pending.set(id, task);
+  return task;
+}
+
+function ensureFilled(id) {
+  const name = String(id).slice(7);
+  if (!filledNames.has(name)) return Promise.resolve(null);
+  const inflight = pending.get(id);
+  if (inflight) return inflight;
+  const task = loadFilledNodes().then((nodes) => {
+    const node = nodes[name];
+    pending.delete(id);
+    if (!node) return null;
+    const mark = filledMark(name, node, []);
+    byId[mark.id] = mark;
+    return mark;
+  }).catch(() => {
+    pending.delete(id);
+    return null;
   });
   pending.set(id, task);
   return task;
@@ -158,5 +266,8 @@ function nodesToSvg(nodes) {
 export function markPreview(id, color = 'currentColor') {
   const mark = getMark(id);
   const inner = nodesToSvg(mark.data.node);
+  if (mark.paint === 'fill') {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}">${inner}</svg>`;
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 }

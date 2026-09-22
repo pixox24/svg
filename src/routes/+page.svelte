@@ -20,11 +20,13 @@
       />
     {:else}
     <div class="mat">
-      <div class="piece">
+      <div class="piece" style="--ar: {frameSize.width}/{frameSize.height}">
+        <CanvasBar bind:canvas bind:flipped bind:fit bind:dpi />
         <div
           class="sheet"
           class:ink={stage === 'ink' && tab === 'graph'}
           class:source={tab === 'svg'}
+          style="--sheet-bg: {frameBg}"
         >
           {#key selectedId}
             <div class="print">
@@ -147,6 +149,7 @@
   import Editor from '../components/editor/index.svelte';
   import Sidebar from '../components/Sidebar.svelte';
   import LookPanel from '../components/LookPanel.svelte';
+  import CanvasBar from '../components/CanvasBar.svelte';
   import TabbiedStage from '../components/TabbiedStage.svelte';
   import TabbiedLibrary from '../components/TabbiedLibrary.svelte';
   import { supportsSvgExport } from 'tabbied';
@@ -162,7 +165,18 @@
   } from '../catalog.js';
   import { loadTabbiedFamily, warmupPatterns } from '../tabbiedCatalog.js';
   import { stageFromBg } from '../lib/rng.js';
-  import { copyText, downloadFile, svgBlob, svgToPngBlob } from '../lib/export.js';
+  import { copyText, downloadFile, svgBlob, svgToPngBlob, frameSvg } from '../lib/export.js';
+  import {
+    DEFAULT_CANVAS,
+    DEFAULT_DPI,
+    DEFAULT_FIT,
+    DPI_STEPS,
+    FIT_MODES,
+    encodeCanvas,
+    exportScale,
+    parseCanvasParam,
+    toPixels
+  } from '../lib/canvases.js';
 
   let selectedId = DEFAULT_ID;
   let family = familyForSketch(DEFAULT_ID);
@@ -178,16 +192,26 @@
   let exportNote = '';
   let noteTimer;
   let tabbiedStage;
-  let tabbiedSvg = '';
+  let tabbiedRaw = '';
+  let tabbiedStatus = '';
   let libraryOpen = false;
   let libraryQuery = '';
   let loadGen = 0;
+  let canvas = DEFAULT_CANVAS;
+  let flipped = false;
+  let fit = DEFAULT_FIT;
+  let dpi = DEFAULT_DPI;
 
   $: current = getSketch(selectedId);
   $: isTabbied = family?.kind === 'tabbied';
   $: isCustom = !isNull(codeFromQuery) || selectedId === 'other';
   $: rendered = isTabbied ? '' : svg(code);
-  $: svgCode = tab === 'svg' ? prettySVG(rendered) : rendered;
+  $: frameSize = toPixels(canvas, flipped, { scale: 1, dpi });
+  $: frameBg = params.bg || params.palette?.[0] || (stage === 'ink' ? '#101216' : '#f2eee6');
+  $: frameOpts = { width: frameSize.width, height: frameSize.height, fit, bg: frameBg };
+  $: framed = isTabbied ? '' : frameSvg(rendered, frameOpts);
+  $: svgCode = tab === 'svg' ? prettySVG(framed) : framed;
+  $: tabbiedSvg = tabbiedRaw ? frameSvg(tabbiedRaw, frameOpts) : tabbiedStatus;
   $: preset = family ? matchingPreset(family, params) : null;
   $: dirty = Boolean(family) && !preset && !ejected;
   $: lookName = isCustom ? 'From URL' : ejected ? `${current?.name || 'Look'} · edited` : (preset?.name || (dirty ? 'Custom' : current?.name || ''));
@@ -195,6 +219,7 @@
   $: stage = family
     ? stageFromBg(params.bg || params.palette?.[0] || '#f2eee6')
     : (current?.stage || 'paper');
+  $: if (mounted) persistCanvas(canvas, flipped, fit, dpi);
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -353,13 +378,16 @@
   }
 
   async function loadTabbiedSvg() {
-    tabbiedSvg = 'Rendering SVG…';
+    tabbiedStatus = 'Rendering SVG…';
+    tabbiedRaw = '';
     try {
       const result = await tabbiedExportSvg();
-      tabbiedSvg = result.svg;
+      tabbiedRaw = result.svg;
+      tabbiedStatus = '';
       if (result.warnings && result.warnings.length) note(result.warnings[0]);
     } catch (error) {
-      tabbiedSvg = error.message || String(error);
+      tabbiedRaw = '';
+      tabbiedStatus = error.message || String(error);
     }
   }
 
@@ -367,7 +395,7 @@
     try {
       if (isTabbied) {
         const result = await tabbiedExportSvg();
-        await copyText(result.svg);
+        await copyText(frameSvg(result.svg, frameOpts));
       } else {
         await copyText(svgCode);
       }
@@ -379,7 +407,9 @@
 
   async function downloadSvg() {
     try {
-      const markup = isTabbied ? (await tabbiedExportSvg()).svg : svgCode;
+      const markup = isTabbied
+        ? frameSvg((await tabbiedExportSvg()).svg, frameOpts)
+        : svgCode;
       downloadFile(`${fileBase()}.svg`, svgBlob(markup));
       note('SVG downloaded');
     } catch (e) {
@@ -389,15 +419,15 @@
 
   async function downloadPng(scale) {
     try {
-      if (isTabbied) {
-        const result = await tabbiedExportSvg();
-        const blob = await svgToPngBlob(result.svg, scale);
-        downloadFile(`${fileBase()}.png`, blob);
-      } else {
-        const blob = await svgToPngBlob(svgCode, scale);
-        downloadFile(`${fileBase()}.png`, blob);
-      }
-      note('PNG downloaded');
+      const raw = isTabbied ? (await tabbiedExportSvg()).svg : rendered;
+      const target = toPixels(canvas, flipped, {
+        scale: exportScale(canvas) === 1 ? 1 : scale,
+        dpi
+      });
+      const out = frameSvg(raw, { width: target.width, height: target.height, fit, bg: frameBg });
+      const blob = await svgToPngBlob(out, target.width, target.height);
+      downloadFile(`${fileBase()}.png`, blob);
+      note(`PNG ${target.width}×${target.height}`);
     } catch (e) {
       note(e.message || 'PNG failed');
     }
@@ -461,8 +491,56 @@
     if (e.key === '\\') toggleInspector();
   }
 
+  function restoreCanvas(query) {
+    let encoded = query.get('canvas');
+    let flip = query.get('flip') === '1';
+    let fitParam = query.get('fit');
+    let dpiParam = Number(query.get('dpi'));
+    if (!encoded) {
+      try {
+        const saved = JSON.parse(localStorage.getItem('svg-canvas') || 'null');
+        if (saved) {
+          encoded = saved.canvas;
+          flip = !!saved.flip;
+          fitParam = saved.fit;
+          if (saved.dpi) dpiParam = Number(saved.dpi);
+        }
+      } catch (e) {}
+    }
+    const parsed = parseCanvasParam(encoded);
+    if (parsed) canvas = parsed;
+    flipped = flip;
+    if (fitParam && FIT_MODES.some((m) => m.id === fitParam)) fit = fitParam;
+    if (DPI_STEPS.includes(dpiParam)) dpi = dpiParam;
+  }
+
+  function persistCanvas(c, flip, f, d) {
+    const encoded = encodeCanvas(c);
+    const isDefault = encoded === DEFAULT_CANVAS.id && !flip && f === DEFAULT_FIT && d === DEFAULT_DPI;
+    try {
+      localStorage.setItem('svg-canvas', JSON.stringify({ canvas: encoded, flip, fit: f, dpi: d }));
+    } catch (e) {}
+    const query = new URLSearchParams(location.search);
+    if (isDefault) {
+      query.delete('canvas');
+      query.delete('flip');
+      query.delete('fit');
+      query.delete('dpi');
+    } else {
+      query.set('canvas', encoded);
+      if (flip) query.set('flip', '1');
+      else query.delete('flip');
+      query.set('fit', f);
+      if (d !== DEFAULT_DPI) query.set('dpi', String(d));
+      else query.delete('dpi');
+    }
+    const qs = query.toString();
+    history.replaceState('', '', location.pathname + (qs ? '?' + qs : ''));
+  }
+
   function init() {
     let query = new URLSearchParams(location.search);
+    restoreCanvas(query);
     codeFromQuery = query.get('code');
     const id = query.get('id') || query.get('name');
     if (codeFromQuery) {
@@ -538,7 +616,8 @@
 
   .piece {
     --caption-stack: 4.35rem;
-    width: min(100cqi, calc(100cqb - var(--caption-stack)));
+    --bar-stack: 3.4rem;
+    width: min(100cqi, calc((100cqb - var(--caption-stack) - var(--bar-stack)) * var(--ar, 1)));
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -547,10 +626,10 @@
   .sheet {
     position: relative;
     width: 100%;
-    aspect-ratio: 1;
+    aspect-ratio: var(--ar, 1);
     border-radius: 3px;
     overflow: hidden;
-    background: var(--paper);
+    background: var(--sheet-bg, var(--paper));
     box-shadow:
       0 0 0 1px rgba(0, 0, 0, 0.28),
       0 1px 1px rgba(0, 0, 0, 0.12),
@@ -558,7 +637,6 @@
   }
 
   .sheet.ink {
-    background: var(--ink);
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.08),
       0 1px 1px rgba(0, 0, 0, 0.35),
@@ -874,6 +952,7 @@
     }
     .piece {
       --caption-stack: 3.8rem;
+      --bar-stack: 3.2rem;
     }
     .identity h2 {
       font-size: 0.95rem;

@@ -17,6 +17,61 @@ function normalizeSvg(svgText) {
   return markup;
 }
 
+function round4(v) {
+  return Math.round(v * 1e4) / 1e4;
+}
+
+export function frameSvg(svgText, { width, height, fit = 'cover', bg } = {}) {
+  const markup = normalizeSvg(svgText);
+  if (!markup) return markup;
+  const open = markup.match(/<svg\b[^>]*>/i);
+  if (!open || !(width > 0) || !(height > 0)) return markup;
+
+  const viewBoxMatch = markup.match(/viewBox="([^"]+)"/i);
+  const nums = viewBoxMatch
+    ? viewBoxMatch[1].trim().split(/[\s,]+/).map(Number)
+    : [0, 0, width, height];
+  const vx = Number.isFinite(nums[0]) ? nums[0] : 0;
+  const vy = Number.isFinite(nums[1]) ? nums[1] : 0;
+  const vw = nums[2] > 0 ? nums[2] : width;
+  const vh = nums[3] > 0 ? nums[3] : height;
+
+  let sx;
+  let sy;
+  if (fit === 'none') {
+    sx = width / vw;
+    sy = height / vh;
+  } else {
+    sx = fit === 'contain'
+      ? Math.min(width / vw, height / vh)
+      : Math.max(width / vw, height / vh);
+    sy = sx;
+  }
+  const tx = width / 2 - (vx + vw / 2) * sx;
+  const ty = height / 2 - (vy + vh / 2) * sy;
+  const transform = sx === sy
+    ? `translate(${round4(tx)} ${round4(ty)}) scale(${round4(sx)})`
+    : `translate(${round4(tx)} ${round4(ty)}) scale(${round4(sx)} ${round4(sy)})`;
+
+  const openTag = open[0]
+    .replace(/\sviewBox="[^"]*"/i, '')
+    .replace(/\spreserveAspectRatio="[^"]*"/i, '')
+    .replace(/\swidth="[^"]*"/i, '')
+    .replace(/\sheight="[^"]*"/i, '')
+    .replace(/\s*\/?>$/, '')
+    + ` width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+
+  const inner = markup
+    .slice(open.index + open[0].length)
+    .replace(/<\/svg\s*>\s*$/i, '');
+
+  const fill = bg
+    ? `<rect x="0" y="0" width="${width}" height="${height}" fill="${bg}"/>`
+    : '';
+
+  return `${openTag}${fill}<g transform="${transform}">${inner}</g></svg>`;
+}
+
 export function downloadFile(filename, blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -36,13 +91,16 @@ export function svgBlob(svgText) {
   return new Blob([normalizeSvg(svgText)], { type: 'image/svg+xml' });
 }
 
-export async function svgToPngBlob(svgText, scale = 2) {
+export async function svgToPngBlob(svgText, width = 0, height = 0) {
   const markup = normalizeSvg(svgText);
-  const { width, height } = viewBoxSize(markup);
-  const long = Math.max(width, height, 1);
-  const target = 1024 * scale;
-  const w = Math.max(1, Math.round((width / long) * target));
-  const h = Math.max(1, Math.round((height / long) * target));
+  let w = Math.round(width);
+  let h = Math.round(height);
+  if (!(w > 0) || !(h > 0)) {
+    const size = viewBoxSize(markup);
+    const long = Math.max(size.width, size.height, 1) || 1024;
+    w = Math.max(1, Math.round((size.width / long) * 2048));
+    h = Math.max(1, Math.round((size.height / long) * 2048));
+  }
   const url = URL.createObjectURL(svgBlob(markup));
   try {
     const image = new Image();
@@ -66,8 +124,8 @@ export async function svgToPngBlob(svgText, scale = 2) {
   }
 }
 
-export async function copyPng(svgText, scale = 2) {
-  const blob = await svgToPngBlob(svgText, scale);
+export async function copyPng(svgText) {
+  const blob = await svgToPngBlob(svgText);
   if (navigator.clipboard && window.ClipboardItem) {
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
     return;
