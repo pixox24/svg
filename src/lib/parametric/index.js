@@ -146,6 +146,13 @@ export function randomize(input, seed, lockedKeys = []) {
     out['lattice.count'] = Math.max(260, out['lattice.count']);
   }
   out['modulator.seed'] = Math.floor(rand() * 99999);
+  // 上面的"可用性约束"会无条件改写若干键（尺寸、行列数、密度、种子…），
+  // 于是锁定形同虚设：锁住 shape.sizeMax=10 与 modulator.seed=42，结果被改成 59.8 和 91293。
+  // 与其在每处加判断，不如在这里统一把锁住的键恢复成调用方传入的值 —— 锁的定义就是"别动它"。
+  const src = input || {};
+  for (const key of locked) {
+    if (Object.prototype.hasOwnProperty.call(src, key)) out[key] = src[key];
+  }
   return normalize(out);
 }
 

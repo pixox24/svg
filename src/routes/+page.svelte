@@ -211,7 +211,13 @@
   $: isCustom = !isNull(codeFromQuery) || selectedId === 'other';
   $: rendered = isTabbied ? '' : (isParametric ? code : svg(code));
   $: frameSize = toPixels(canvas, flipped, { scale: 1, dpi });
-  $: frameBg = params.bg || params.palette?.[0] || (stage === 'ink' ? '#101216' : '#f2eee6');
+  // 舞台底色与 frameSvg 的底色。注意参数化引擎的 invert 会交换底/前景，
+  // 这里必须跟着换 —— 否则 fit=contain 时舞台与作品之间会露出一圈旧底色
+  // （实测导出 SVG 里会叠着 #101216 和 #f4f1ea 两块矩形）。
+  $: frameBg = (() => {
+    const base = params.bg || params.palette?.[0] || (stage === 'ink' ? '#101216' : '#f2eee6');
+    return isParametric && params.invert ? (params.palette?.[1] || base) : base;
+  })();
   $: frameOpts = { width: frameSize.width, height: frameSize.height, fit, bg: frameBg };
   $: framed = isTabbied ? '' : frameSvg(rendered, frameOpts);
   $: svgCode = tab === 'svg' ? prettySVG(framed) : framed;
