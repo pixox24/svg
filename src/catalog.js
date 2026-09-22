@@ -1,4 +1,5 @@
 import { systems } from './systems.js';
+import { PRESETS as PARAMETRIC_PRESETS } from './lib/parametric/presets.js';
 import { stageFromBg } from './lib/rng.js';
 import {
   TABBIED_CATALOG,
@@ -256,6 +257,20 @@ export const families = [
       { id: 'tide-radar', name: 'Radar', params: { stroke: '#4ade80', fill: 'none', bg: INK, samples: 240, strokeWidth: 0.2, amp: 3.2, f1: 3, f2: 9 } },
       { id: 'tide-silk', name: 'Silk', params: { stroke: '#b76e79', fill: '#f6eae4', bg: PAPER, samples: 400, strokeWidth: 0.08, amp: 7, f1: 6, f2: 18 } }
     ]
+  },
+  {
+    id: 'parametric',
+    label: 'Parametric',
+    blurb: 'A position field times a modulation curve times a primitive times a topology — dial any of them and the whole pattern re-derives.',
+    tags: ['pattern', 'code'],
+    kind: 'parametric',
+    ...systems.parametric,
+    // variants 直接由引擎的预设生成，避免两处维护同一份参数
+    variants: PARAMETRIC_PRESETS.map((preset) => ({
+      id: preset.id,
+      name: `${preset.nameZh} · ${preset.name}`,
+      params: preset.params
+    }))
   }
 ];
 

@@ -130,11 +130,41 @@ run('C1 systems.js 注册了 parametric', () => {
 run('C2 catalog.js 有 parametric family 与 14 个 variants', () => {
   const s = readFileSync(join(ROOT, 'src/catalog.js'), 'utf8');
   need(/id:\s*'parametric'/.test(s), '没有 parametric family');
+  need(/kind:\s*'parametric'/.test(s), '没有 kind: parametric（页面靠它跳过 css-doodle 包装）');
+  // variants 是由 PARAMETRIC_PRESETS 动态生成的（避免两处维护同一份参数），
+  // 所以这里检查生成表达式 + 预设数量，而不是去找字面量 id。
+  need(/PARAMETRIC_PRESETS\.map/.test(s), 'variants 没有从 PARAMETRIC_PRESETS 生成');
   const presets = readFileSync(join(ROOT, 'src/lib/parametric/presets.js'), 'utf8');
   const ids = [...presets.matchAll(/id:\s*'(p-[a-z-]+)'/g)].map((m) => m[1]);
   need(ids.length === 14, `预设数不是 14：${ids.length}`);
-  for (const id of ids) need(s.includes(id), `catalog 里缺少 variant ${id}`);
-  return `14 个 variant 齐备`;
+  return `${ids.length} 个预设已由 catalog 动态生成`;
+});
+
+run('C2b 14 个缩略图实体存在且是合法 SVG', () => {
+  const dir = join(ROOT, 'static/thumbs');
+  const presets = readFileSync(join(ROOT, 'src/lib/parametric/presets.js'), 'utf8');
+  const ids = [...presets.matchAll(/id:\s*'(p-[a-z-]+)'/g)].map((m) => m[1]);
+  const missing = [];
+  const bad = [];
+  for (const id of ids) {
+    const f = join(dir, `${id}.svg`);
+    if (!existsSync(f)) { missing.push(id); continue; }
+    const body = readFileSync(f, 'utf8');
+    if (!body.startsWith('<svg') || !body.endsWith('</svg>')) bad.push(id);
+  }
+  need(missing.length === 0, `缺少缩略图: ${missing.join(', ')}`);
+  need(bad.length === 0, `缩略图非法: ${bad.join(', ')}`);
+  return `${ids.length}/${ids.length} 张，且都是合法 SVG`;
+});
+
+run('C2c 预渲染产物里侧栏真的列出了 parametric', () => {
+  // 用构建产物验证「集成真的生效了」。这比在 Node 里 import catalog.js 更强 ——
+  // 后者会撞上仓库既有的 tabbied JSON 导入问题（与本次改动无关）。
+  const html = readFileSync(join(ROOT, 'build/index.html'), 'utf8');
+  need(/parametric/i.test(html), 'build/index.html 里没有 parametric');
+  need(html.includes('p-iso-maze'), '侧栏没有引用 p-iso-maze 缩略图');
+  need(html.includes('等轴测迷宫') || html.includes('Iso Maze'), '侧栏没有列出预设名称');
+  return '预渲染 HTML 含 family 与缩略图引用';
 });
 
 run('C3 +page.svelte 有 parametric 渲染分支', () => {
@@ -142,6 +172,20 @@ run('C3 +page.svelte 有 parametric 渲染分支', () => {
   need(/isParametric/.test(s), '没有 isParametric 判定');
   need(/isParametric\s*\?\s*code\s*:\s*svg\(code\)/.test(s), 'rendered 分支写法不符');
   return 'rendered 分支正确';
+});
+
+run('C4 LookPanel 兼容 {value,label} 形式的 select 选项', () => {
+  const s = readFileSync(join(ROOT, 'src/components/LookPanel.svelte'), 'utf8');
+  need(/function optionValue/.test(s), '没有 optionValue 助手');
+  need(/function optionLabel/.test(s), '没有 optionLabel 助手');
+  need(/optionLabel\(option\)/.test(s), 'select 分支没有用 optionLabel 渲染');
+  // 反向检查：不能还残留直接把 option 对象插值进模板的写法（会渲染成 [object Object]）
+  need(!/>\{option\}<\/button>/.test(s), 'select 分支仍在直接插值 option');
+  // 引擎侧确认确实用的是对象形式（否则这条检查没有意义）
+  const schema = readFileSync(join(ROOT, 'src/lib/parametric/schema.js'), 'utf8');
+  need(/label:\s*labels\?\.\[value\]/.test(schema) || /const opts = \(values, labels\)/.test(schema),
+    '引擎 schema 不再使用 {value,label} 形式，这条检查应重新评估');
+  return '两种选项形式都受支持';
 });
 
 console.log('\n【D. 构建】');

@@ -61,12 +61,13 @@
         {:else if field.type === 'select'}
           <div class="pills">
             {#each field.options as option}
+              {@const opt = optionValue(option)}
               <button
                 type="button"
                 class="pill"
-                class:on={params[field.key] === option}
-                on:click={() => set(field.key, option)}
-              >{option}</button>
+                class:on={params[field.key] === opt}
+                on:click={() => set(field.key, opt)}
+              >{optionLabel(option)}</button>
             {/each}
           </div>
         {:else if field.type === 'range'}
@@ -305,6 +306,20 @@
   }
 
   $: visibleFields = schema.filter((field) => !field.showIf || field.showIf(params));
+
+  // Select options come in two shapes and both must work:
+  //   - a plain string, the original convention used by the built-in systems
+  //   - { value, label }, used by the parametric engine so an option can carry a
+  //     stable machine value while displaying a translated label
+  // Without this, object options render as "[object Object]".
+  function optionValue(option) {
+    return option && typeof option === 'object' ? option.value : option;
+  }
+
+  function optionLabel(option) {
+    if (option && typeof option === 'object') return option.label ?? option.value;
+    return option;
+  }
 
   function set(key, value) {
     dispatch('change', { ...params, [key]: value });

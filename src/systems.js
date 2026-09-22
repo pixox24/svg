@@ -1,5 +1,11 @@
 import { randomSeed, stageFromBg, evenCells, mulberry32 } from './lib/rng.js';
 import { markDoodle, markPaint } from './lib/marks.js';
+import {
+  toSvg as engineSvg,
+  SCHEMA as ENGINE_SCHEMA,
+  randomize as engineRandomize,
+  randomSeed as engineSeed
+} from './lib/parametric/index.js';
 
 function read(input) {
   let temp = input.replace(/^\n+/g, '');
@@ -507,6 +513,21 @@ export const tide = {
   }
 };
 
+/**
+ * Parametric —— 参数化图形引擎。
+ *
+ * 与其它 system 的关键差别：compile() 返回的是**完整的 SVG 文档字符串**，
+ * 而不是 css-doodle 的 DSL。页面里对 kind === 'parametric' 的 family 会跳过
+ * css-doodle 的 svg() 包装（见 src/routes/+page.svelte 的 rendered 派生）。
+ *
+ * 引擎本身在 src/lib/parametric/，零 npm 依赖、纯函数、可在 Node 下直接 import。
+ */
+export const parametric = {
+  schema: ENGINE_SCHEMA,
+  compile: (params) => engineSvg(params),
+  shuffle: (params) => engineRandomize(params, engineSeed())
+};
+
 export const systems = {
   marks,
   crystal,
@@ -515,5 +536,6 @@ export const systems = {
   spiral,
   orb,
   halo,
-  tide
+  tide,
+  parametric
 };

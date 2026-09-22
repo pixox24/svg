@@ -204,8 +204,11 @@
 
   $: current = getSketch(selectedId);
   $: isTabbied = family?.kind === 'tabbied';
+  // Parametric families compile straight to a finished SVG document, so they must
+  // skip css-doodle's svg() wrapper that every other family goes through.
+  $: isParametric = family?.kind === 'parametric';
   $: isCustom = !isNull(codeFromQuery) || selectedId === 'other';
-  $: rendered = isTabbied ? '' : svg(code);
+  $: rendered = isTabbied ? '' : (isParametric ? code : svg(code));
   $: frameSize = toPixels(canvas, flipped, { scale: 1, dpi });
   $: frameBg = params.bg || params.palette?.[0] || (stage === 'ink' ? '#101216' : '#f2eee6');
   $: frameOpts = { width: frameSize.width, height: frameSize.height, fit, bg: frameBg };

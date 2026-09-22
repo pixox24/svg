@@ -19,11 +19,18 @@ const ORANGE = '#FFA500';
 
 /**
  * 预设构造器。
- * 强制 shape.scaleToUnit = false —— 本文件里所有预设的尺寸都按像素书写，
- * 而 DEFAULTS 可能变化，因此在这里显式钉死，避免预设被默认值悄悄改语义。
- * （这正是 p-polar-spiral 曾经渲染成空白的原因：半径被缩成 0.03px）
+ *  1. 强制 shape.scaleToUnit = false —— 本文件里所有预设的尺寸都按像素书写，
+ *     而 DEFAULTS 可能变化，因此在这里显式钉死，避免预设被默认值悄悄改语义。
+ *     （这正是 p-polar-spiral 曾经渲染成空白的原因：半径被缩成 0.03px）
+ *  2. 把 bg 同步成 palette[0] —— 项目的 stageFromBg(params.bg || PAPER) 与
+ *     frameBg 都靠这个字段判定 paper/ink 主题。若不同步，深色预设（如黑底
+ *     白圆的圆脉）会被当成浅色主题，缩略图与舞台底色全错。
  */
-const preset = (over) => ({ ...defaults(), 'shape.scaleToUnit': false, ...over });
+const preset = (over) => {
+  const p = { ...defaults(), 'shape.scaleToUnit': false, ...over };
+  if (Array.isArray(p.palette) && p.palette[0]) p.bg = p.palette[0];
+  return p;
+};
 
 export const PRESETS = [
   {
