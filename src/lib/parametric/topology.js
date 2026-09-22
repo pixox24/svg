@@ -9,6 +9,7 @@ import { cellRandom, evaluate } from './modulator.js';
 import { fbm } from './hash.js';
 import { build } from './primitive.js';
 import { clampNum } from './lattice.js';
+import { canvasSize } from './compose.js';
 
 const r2 = (n) => Math.round(n * 100) / 100;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -34,6 +35,11 @@ export function apply(cells, p, ctx) {
       return truchet(work, p, ctx, density, seed);
     case 'maze':
       return maze(work, p, ctx, density, seed);
+    case 'lattice':
+      // 完整墙网络：底场每个单元都画出与邻居共享的边（iso/hex 即蜂窝）。
+      // 参考图 #01 就是这个东西 —— 分析里写的"三正则图，Y 形与 T 形节点"正是蜂窝，
+      // 而不是迷宫（迷宫会抽掉一整套生成树，墙网络稀疏得多）。
+      return latticeWalls(work, p, ctx, density, seed);
     case 'halftone':
       return halftone(work, p, ctx, seed);
     case 'invert':
@@ -115,7 +121,145 @@ function truchet(cells, p, ctx, density, seed) {
  * 墙体方向随底场变化，这点很重要 —— 参考图 #01 是**等轴测**迷宫
  * （90°/60°/120° 三向线，Y 形节点），若一律画直角墙就完全不是那个东西了。
  */
+/**
+ * 六角点阵的墙网络 —— iso 与 hex 底场共用。
+ *
+ * 这两个底场其实是同一种点阵：每个格点到 6 个邻居的距离都等于 dx
+ * （同行左右各 dx；上下两行的格点错开半格，斜向距离是 hypot(dx/2, dx*√3/2) = dx）。
+ *
+ * 所以墙的正确画法是「相邻两格点连线的中垂线」：围绕每个格点形成边长 dx/√3 的正六边形，
+ * 顶点处三条边相接 —— 这正是参考图 #01 的"三正则图，Y 形与 T 形节点"。
+ * 打通通道 = 抽掉两个格点共享的那一面墙，于是剩下的墙必然首尾相接。
+ *
+ * 踩过的坑：早先 iso 被画成"竖直主干 + 两条 60° 斜枝"的 Y 形，通道再按方向随手判，
+ * 结果 151 条线断成 55 个连通分量（完美迷宫的墙网络应当连通），另有 29 条线画到
+ * viewBox 外面。根因就是墙没有画在真正共享的边上 —— 斜枝既不对着邻居，也不在中点相接。
+ *
+ * 另外 DFS 的边界直接用实际存在的单元格，不再用参数里的 rows，
+ * 所以不会出现"通道开向不存在的行"（旧实现里 iso/hex 会丢掉放不下的行，
+ * cols=4/rows=40 时只有 j=0..3，六角底行整排丢边）。
+ *
+ * @param {boolean} withMaze true = 先跑 DFS 生成完美迷宫；false = 保留全部墙
+ */
+function hexWallNetwork(cells, p, density, seed, withMaze) {
+  // apply() 拿到的是点号键名的原始参数，里面没有 w/h，画布尺寸必须从 canvasSize 取。
+  // 早先直接读 p.w → undefined → dx = NaN → 坐标全是 NaN，一条线都画不出来。
+  const { width: w, height: h } = canvasSize(p);
+  const cols = Math.max(1, Math.round(clampNum(p['lattice.cols'], 1, 80)));
+  const dx = w / cols;
+  const halfEdge = dx / (2 * Math.sqrt(3)); // 六边形边长的一半
+  const sw = clampNum(p['shape.strokeWidth'], 0.1, 200);
+  if (!cells.length) return [];
+
+  const cellAt = new Map();
+  for (const c of cells) cellAt.set(`${c.i},${c.j}`, c);
+  const kk = (i, j) => `${i},${j}`;
+  const wid = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  // 奇数行右移半格，邻接偏移随行奇偶变化。六个方向两两相对，等距。
+  const offsets = (j) => (j % 2 === 0
+    ? [[-1, -1], [0, -1], [-1, 0], [1, 0], [-1, 1], [0, 1]]
+    : [[0, -1], [1, -1], [-1, 0], [1, 0], [0, 1], [1, 1]]);
+
+  // 全部真实共享墙：只在两个格点都存在时才计入，所以不会越界
+  const shared = new Set();
+  for (const c of cells) {
+    for (const [di, dj] of offsets(c.j)) {
+      if (!cellAt.has(kk(c.i + di, c.j + dj))) continue;
+      shared.add(wid(kk(c.i, c.j), kk(c.i + di, c.j + dj)));
+    }
+  }
+
+  const open = new Set();
+  if (withMaze) {
+    const seen = new Set([kk(cells[0].i, cells[0].j)]);
+    const stack = [[cells[0].i, cells[0].j]];
+    const rnd = (i, j) => cellRandom({ i, j }, seed + 991);
+    while (stack.length) {
+      const [ci, cj] = stack[stack.length - 1];
+      const next = [];
+      for (const [di, dj] of offsets(cj)) {
+        const ni = ci + di;
+        const nj = cj + dj;
+        if (!cellAt.has(kk(ni, nj)) || seen.has(kk(ni, nj))) continue;
+        next.push([ni, nj, wid(kk(ci, cj), kk(ni, nj))]);
+      }
+      if (!next.length) {
+        stack.pop();
+        continue;
+      }
+      const k = Math.min(next.length - 1, Math.floor(rnd(ci * 13 + stack.length, cj * 7) * next.length));
+      seen.add(kk(next[k][0], next[k][1]));
+      open.add(next[k][2]);
+      stack.push([next[k][0], next[k][1]]);
+    }
+  }
+
+  // 连通密度：再拆掉一部分墙。0 = 全部隔开（最密），1 = 全部连通（最空），
+  // 与 schema 里"连通密度 0 孤立 / 1 连通"的定义一致。旧实现完全没读这个值，
+  // 所以滑杆在网格/等轴测/六角上都是死的（取 0 和 1 输出逐字节相同）。
+  const strip = clampNum(density, 0, 1);
+  if (strip > 0.001) {
+    for (const id of shared) {
+      if (open.has(id)) continue;
+      const [a, b] = id.split('|');
+      const [ai, aj] = a.split(',').map(Number);
+      const [bi, bj] = b.split(',').map(Number);
+      if (cellRandom({ i: ai * 131 + bi * 17, j: aj * 97 + bj * 7 }, seed + 1237) < strip) {
+        open.add(id);
+      }
+    }
+  }
+
+  const out = [];
+  const emitted = new Set();
+  const margin = sw * 0.5 + 1;
+  for (const c of cells) {
+    for (const [di, dj] of offsets(c.j)) {
+      const other = cellAt.get(kk(c.i + di, c.j + dj));
+      if (!other) continue;
+      const id = wid(kk(c.i, c.j), kk(other.i, other.j));
+      if (open.has(id) || emitted.has(id)) continue;
+      emitted.add(id);
+      // 中垂线：中点 ± 垂直单位向量 * 半边长
+      const mx = (c.x + other.x) / 2;
+      const my = (c.y + other.y) / 2;
+      const vx = other.x - c.x;
+      const vy = other.y - c.y;
+      const len = Math.hypot(vx, vy) || 1;
+      const px = (-vy / len) * halfEdge;
+      const py = (vx / len) * halfEdge;
+      const x1 = mx + px;
+      const y1 = my + py;
+      const x2 = mx - px;
+      const y2 = my - py;
+      if (x1 < margin || x1 > w - margin || x2 < margin || x2 > w - margin) continue;
+      if (y1 < margin || y1 > h - margin || y2 < margin || y2 > h - margin) continue;
+      out.push(`<line x1="${r2(x1)}" y1="${r2(y1)}" x2="${r2(x2)}" y2="${r2(y2)}" stroke-width="${r2(sw)}"/>`);
+    }
+  }
+  return out;
+}
+
+/** 完整墙网络：把底场每个单元与邻居共享的边都画出来（iso / hex 的蜂窝）。 */
+function latticeWalls(cells, p, ctx, density, seed) {
+  // 只有点阵型底场才有"共享边"可言。面板的 showIf 挡不住手动组合
+  // （比如 点阵簇 + 织网、同心环 + 织网），那些底场的 i,j 不是网格索引，
+  // 硬画会得到一堆几何上无意义的线。这里退回普通基元绘制，宁可平淡也不出垃圾。
+  if (!['iso', 'hex'].includes(p['lattice.type'])) return plain(cells, p, ctx, seed);
+  return hexWallNetwork(cells, p, density, seed, false);
+}
+
 function maze(cells, p, ctx, density, seed) {
+  const kind = p['lattice.type'];
+  // iso 与 hex 是同一种点阵（每个格点到 6 个邻居等距），墙必须画在相邻格点连线的
+  // 中垂线上 —— 详见 hexWallNetwork。按方向随手判通道会画出接不起来的碎片。
+  if (kind === 'iso' || kind === 'hex') {
+    return hexWallNetwork(cells, p, density, seed, true);
+  }
+  // 直角网格以外的底场（点阵簇 / 同心环 / 叶序 / 螺旋…）的 i,j 不是网格索引，
+  // 硬当成网格会画出一堆无意义的线（实测 点阵簇+迷宫 → 695 个单元只有 61 组不同 i,j，
+  // 产出 1474 条线）。退回普通基元绘制。
+  if (kind !== 'grid') return plain(cells, p, ctx, seed);
   const cols = Math.max(1, Math.round(clampNum(p['lattice.cols'], 1, 80)));
   const rows = Math.max(1, Math.round(clampNum(p['lattice.rows'], 1, 80)));
   const cellAt = new Map();
@@ -150,61 +294,12 @@ function maze(cells, p, ctx, density, seed) {
   }
 
   const sw = clampNum(p['shape.strokeWidth'], 0.1, 200);
-  const kind = p['lattice.type'];
   const out = [];
 
   for (const c of cells) {
     const ux = Math.max(2, c.unit);
     const X = r2(c.x);
     const Y = r2(c.y);
-
-    if (kind === 'iso') {
-      // 等轴测三向骨架：竖直主干 + 两条 60° 斜枝（Y 形节点）。
-      //
-      // 注意边标识的语义必须与几何一致。早期版本用 wallKey(i, j, -1, 1) 判斜枝，
-      // 而该函数对 di=-1 返回 `${i-1},${j}|v` —— 与"左邻居通道"是同一个键，
-      // 于是"某个方向打通"会拆掉"另一个方向的墙"，整张图退化成 incoherent 的噪声。
-      // 现在只按真实共享关系判断：竖直段由上下通道决定，两条斜枝分别由左右通道决定。
-      const half = ux * 0.5;
-      const dx60 = ux * 0.866;
-      const up = walls.has(wallKey(c.i, c.j, 0, -1));
-      const down = walls.has(wallKey(c.i, c.j, 0, 1));
-      const left = walls.has(wallKey(c.i, c.j, -1, 0));
-      const right = walls.has(wallKey(c.i, c.j, 1, 0));
-      if (!up && !down) {
-        out.push(`<line x1="${X}" y1="${r2(c.y - half)}" x2="${X}" y2="${r2(c.y + half)}" stroke-width="${r2(sw)}"/>`);
-      }
-      const footY = r2(c.y + half);
-      if (!left) {
-        out.push(`<line x1="${X}" y1="${footY}" x2="${r2(c.x - dx60)}" y2="${r2(c.y + half * 2)}" stroke-width="${r2(sw)}"/>`);
-      }
-      if (!right) {
-        out.push(`<line x1="${X}" y1="${footY}" x2="${r2(c.x + dx60)}" y2="${r2(c.y + half * 2)}" stroke-width="${r2(sw)}"/>`);
-      }
-      continue;
-    }
-
-    if (kind === 'hex') {
-      // 六角：六条边，按轴向邻居裁剪
-      const R = ux * 0.54;
-      const verts = [];
-      for (let k = 0; k < 6; k += 1) {
-        const a = (k * Math.PI) / 3;
-        verts.push([c.x + Math.cos(a) * R, c.y + Math.sin(a) * R]);
-      }
-      for (let k = 0; k < 6; k += 1) {
-        // 偶数索引边对应水平邻居，奇数索引对应斜向
-        const di = k === 0 ? 1 : k === 3 ? -1 : 0;
-        const dj = k === 0 || k === 3 ? 0 : (k < 3 ? 1 : -1);
-        if (di || dj) {
-          if (walls.has(wallKey(c.i, c.j, di, dj))) continue;
-        }
-        const a = verts[k];
-        const b = verts[(k + 1) % 6];
-        out.push(`<line x1="${r2(a[0])}" y1="${r2(a[1])}" x2="${r2(b[0])}" y2="${r2(b[1])}" stroke-width="${r2(sw)}"/>`);
-      }
-      continue;
-    }
 
     // 直角网格：水平墙 + 垂直墙
     const half = ux * 0.5;
@@ -231,4 +326,4 @@ function wallKey(i, j, di, dj) {
   return `${i},${j - 1}|h`;
 }
 
-export const TOPOLOGIES = ['isolated', 'truchet', 'maze', 'invert', 'halftone'];
+export const TOPOLOGIES = ['isolated', 'truchet', 'maze', 'lattice', 'invert', 'halftone'];

@@ -32,7 +32,7 @@ const SHAPE_LABELS = {
   polygon: '多边形', curvePoly: '曲边多边形', arc: '弧', ring: '圆环',
 };
 const ROT_LABELS = { none: '固定', grid: '跟随底场', alternate: '交替', tangent: '切线', radial: '径向', noise: '扰动' };
-const TOPO_LABELS = { isolated: '独立', truchet: '特鲁谢连通', maze: '迷宫', halftone: '半调', invert: '反相' };
+const TOPO_LABELS = { isolated: '独立', truchet: '特鲁谢连通', maze: '迷宫', lattice: '织网', halftone: '半调', invert: '反相' };
 const ASPECT_LABELS = { square: '正方', portrait: '竖版', photo: '4:5', tall: '长条', banner: '海报条', landscape: '横版', wide: '宽幅' };
 
 const isOneOf = (key, list) => (p) => list.includes(p[key]);
@@ -102,7 +102,7 @@ export const SCHEMA = [
   { key: 'shape.rotMode', type: 'select', label: '旋转模式', options: opts(ROT_MODES, ROT_LABELS) },
   { key: 'shape.stroke', type: 'toggle', label: '描边模式' },
   { key: 'shape.strokeWidth', type: 'range', label: '线宽', min: 0.1, max: 60, step: 0.1,
-    showIf: (p) => !!p['shape.stroke'] || ['truchet', 'maze'].includes(p['topology.mode']) },
+    showIf: (p) => !!p['shape.stroke'] || ['truchet', 'maze', 'lattice'].includes(p['topology.mode']) },
 
   { key: 'topology.mode', type: 'select', label: '拓扑', options: opts(TOPOLOGIES, TOPO_LABELS) },
   { key: 'topology.jitter', type: 'range', label: '抖动', min: 0, max: 1, step: 0.01 },
@@ -110,7 +110,7 @@ export const SCHEMA = [
   { key: 'topology.warpFreq', type: 'range', label: '形变频率', min: 0.1, max: 8, step: 0.05,
     showIf: (p) => Number(p['topology.warp']) > 0 },
   { key: 'topology.density', type: 'range', label: '连通密度', min: 0, max: 1, step: 0.01,
-    showIf: isOneOf('topology.mode', ['truchet', 'maze', 'halftone']) },
+    showIf: isOneOf('topology.mode', ['truchet', 'maze', 'lattice', 'halftone']) },
   { key: 'topology.halftoneLevels', type: 'range', label: '半调级数', min: 0, max: 1, step: 0.01,
     showIf: isOneOf('topology.mode', ['halftone']) },
 

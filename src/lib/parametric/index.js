@@ -97,13 +97,21 @@ export function randomize(input, seed, lockedKeys = []) {
   }
 
   // —— 可用性约束：避免随机出空白画面 ——
-  // 1) 迷宫需要 i,j 网格型底场，否则画不出墙
-  if (out['topology.mode'] === 'maze' && !['grid', 'hex', 'iso'].includes(out['lattice.type'])) {
-    out['lattice.type'] = pick(['grid', 'hex']);
+  // 1) 迷宫与织网需要 i,j 网格型底场，否则画不出墙
+  if (['maze', 'lattice'].includes(out['topology.mode'])
+    && !['grid', 'hex', 'iso'].includes(out['lattice.type'])) {
+    out['lattice.type'] = pick(['iso', 'hex']);
   }
-  // 2) 连通密度不能太低，否则只剩零星元素
-  if (['truchet', 'maze'].includes(out['topology.mode'])) {
+  // 2) 连通密度的可用区间随模式而定：
+  //    truchet 的密度是"连起来的比例"，越高元素越多 → 需要下限；
+  //    maze / lattice 的密度是"墙被抽掉的比例"，0 = 完美迷宫或完整蜂窝，1 = 墙全拆光
+  //    → 需要上限，否则随机会抽出接近空白的画面（实测 seed 162 抽到 0.86 只剩 6 条线）。
+  if (out['topology.mode'] === 'truchet') {
     out['topology.density'] = Math.max(0.3, out['topology.density']);
+  } else if (out['topology.mode'] === 'maze') {
+    out['topology.density'] = Math.min(0.35, Math.max(0, out['topology.density']));
+  } else if (out['topology.mode'] === 'lattice') {
+    out['topology.density'] = Math.min(0.25, Math.max(0, out['topology.density']));
   }
   // 3) 尺寸下限：随机可能抽到 0.x，视觉上等于空白。
   //    scaleToUnit 时尺寸按单元百分比解释（100 = 一个单元），两种模式分别给合理区间。

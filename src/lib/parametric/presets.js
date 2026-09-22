@@ -35,15 +35,18 @@ const preset = (over) => {
 export const PRESETS = [
   {
     id: 'p-iso-maze',
-    name: 'Iso Maze',
-    nameZh: '等轴测迷宫',
+    nameZh: '等轴测蜂窝',
+    name: 'Iso Honeycomb',
     family: 'grid',
     ref: 'ref-01',
-    // 参考前景 48.5%。密度保持，但刻意把纹样放大（cols 12→7, 线宽 17→33）：
-    // 覆盖率在数学上对尺度近似不变，而特征尺寸翻倍后，侧栏缩略图尺寸下才分辨得出结构
-    // —— cols 12 + 19px 线宽在缩略图里会糊成一块深色，等于用户看不见这个预设。
-    // 参考图本身也是 48.5% 墨量，在同样的缩小尺寸下同样是密实纹理，所以这不是保真度问题，
-    // 是"能不能用"的问题：优先保证可辨识。
+    // 参考前景 48.5%。
+    //
+    // 这个预设原来用 maze 模式，是错的：分析文档里 ref-01 写的是"三正则图，Y 形与 T 形节点"，
+    // 那正是**蜂窝**（六角网格）本身，而迷宫会抽掉一整套生成树、墙网络稀疏得多
+    // （实测 density 0.6 只有 16% 墨量，怎么调线宽都到不了 48.5%）。
+    // 改用 lattice 模式画完整墙网络后：276 条边、1 个连通分量、0 条越界，墨量随线宽线性可控。
+    //
+    // 线宽 21 时墨量 ≈ 48.5%（lattice 会走描边，所以线宽滑杆自动出现）。
     params: preset({
       'canvas.aspect': 'banner',
       palette: [PAPER, INK, ''],
@@ -51,9 +54,9 @@ export const PRESETS = [
       'lattice.cols': 7,
       'lattice.rows': 16,
       'lattice.gap': 0.08,
-      'shape.stroke': true,
-      'shape.strokeWidth': 25,
-      'topology.mode': 'maze',
+      'topology.mode': 'lattice',
+      'topology.density': 0,
+      'shape.strokeWidth': 21,
       'modulator.seed': 7123,
     }),
   },

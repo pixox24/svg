@@ -342,7 +342,7 @@ describe('topology', () => {
 
   for (const mode of TOPOLOGIES) {
     test(`${mode} returns an array`, () => {
-      assert.equal(TOPOLOGIES.length, 5);
+      assert.equal(TOPOLOGIES.length, 6);
       const out = apply(cells, { ...params, 'topology.mode': mode, 'topology.density': 0.75 }, {});
       assert.ok(Array.isArray(out), mode);
     });

@@ -49,7 +49,7 @@ export function compose(fragments, p) {
   const c = colors(p);
   const strokeMode = !!p['shape.stroke'];
   const topo = p['topology.mode'];
-  const painting = strokeMode || topo === 'truchet' || topo === 'maze';
+  const painting = strokeMode || topo === 'truchet' || topo === 'maze' || topo === 'lattice';
 
   const groupAttrs = painting
     ? `fill="none" stroke="${esc(c.accent || c.fg)}" stroke-linecap="${topo === 'maze' ? 'square' : 'butt'}"`
