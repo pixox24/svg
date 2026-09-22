@@ -166,7 +166,7 @@
   import { loadTabbiedFamily, warmupPatterns } from '../tabbiedCatalog.js';
   import { stageFromBg } from '../lib/rng.js';
   import { copyText, downloadFile, svgBlob, svgToPngBlob, frameSvg } from '../lib/export.js';
-  import { encodeParams as encodeEngineParams, decodeParams as decodeEngineParams } from '../lib/parametric/index.js';
+  import { encodeParams as encodeEngineParams, decodeParams as decodeEngineParams, normalize as normalizeEngineParams } from '../lib/parametric/index.js';
   import {
     DEFAULT_CANVAS,
     DEFAULT_DPI,
@@ -242,13 +242,18 @@
 
   function handleParams(e) {
     if (ejected || !family) return;
-    params = e.detail;
+    // 参数化引擎的 normalize 负责让「界面上显示的值」与「编译时实际使用的值」一致：
+    // 种子取整取模、bg 跟随 palette[0]、越界值回落…… 这一步不能省，否则会出两类错：
+    //   · 种子框里留着 100000，而实际按 0 绘制（"输入种子即可复现"就成了假的）
+    //   · 改第三个色块只动了 palette[0]，而舞台底色仍读旧的 params.bg，两边脱节
+    params = isParametric ? normalizeEngineParams(e.detail) : e.detail;
     code = family.compile(params);
   }
 
   function handleShuffle() {
     if (ejected || !family) return;
-    params = family.shuffle(params);
+    const next = family.shuffle(params);
+    params = isParametric ? normalizeEngineParams(next) : next;
     code = family.compile(params);
   }
 

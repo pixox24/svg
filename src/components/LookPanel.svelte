@@ -32,13 +32,27 @@
         {#if field.type === 'palette'}
           <div class="swatches">
             {#each params[field.key] as color, index}
-              <label class="swatch" title={color} style="background: {toHex(color)}">
-                <input
-                  type="color"
-                  value={toHex(color)}
-                  on:input={(e) => setColor(field.key, index, e.target.value)}
-                />
-              </label>
+              {#if color}
+                <label class="swatch" title={color} style="background: {toHex(color)}">
+                  <input
+                    type="color"
+                    value={toHex(color)}
+                    on:input={(e) => setColor(field.key, index, e.target.value)}
+                  />
+                </label>
+              {:else}
+                <!-- 空槽位不能塞进 type="color"：toHex('') 得到 #000000，会显示成黑色，
+                     用户一点就把"未设置"变成了真的黑色，而引擎本来把空强调色理解为
+                     "跟随图形色"。这里显式表达「未设置」，点击时以图形色作为起点，
+                     不凭空造出一个用户没选过的颜色。 -->
+                <button
+                  type="button"
+                  class="swatch empty"
+                  title="未设置（跟随图形色）"
+                  aria-label={`第 ${index + 1} 个颜色未设置，点击选择`}
+                  on:click={() => setColor(field.key, index, emptySwatchStart(field.key))}
+                ></button>
+              {/if}
             {/each}
           </div>
         {:else if field.type === 'color'}
@@ -336,6 +350,12 @@
     dispatch('change', { ...params, [key]: value });
   }
 
+  /** 空槽位点开时的起始色：用图形色（palette[1]），而不是黑色。 */
+  function emptySwatchStart(key) {
+    const list = params[key] || [];
+    return list[1] || list[0] || '#d7e7ee';
+  }
+
   function setColor(key, index, value) {
     const next = params[key].slice();
     next[index] = value;
@@ -496,6 +516,36 @@
 
   .swatch:focus-within {
     box-shadow: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent);
+  }
+
+  /* 空槽位：虚线 + 对角线，明确表达"未设置"，而不是冒充一个黑色色块。
+     注意 .swatch 的 overflow:hidden 会裁掉 ::after，所以这里显式重设。 */
+  .swatch.empty {
+    position: relative;
+    overflow: hidden;
+    background: transparent;
+    border-style: dashed;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .swatch.empty::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    background: linear-gradient(
+      to top right,
+      transparent calc(50% - 0.5px),
+      var(--border-default) calc(50% - 0.5px),
+      var(--border-default) calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    );
+  }
+
+  .swatch.empty:hover,
+  .swatch.empty:focus-visible {
+    border-color: var(--accent);
+    outline: none;
   }
 
   .swatch input {
