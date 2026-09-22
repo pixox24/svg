@@ -553,7 +553,14 @@ export function paramsEqual(a, b, keys) {
 
 export function matchingPreset(family, params) {
   if (!family) return null;
-  const keys = family.schema.map((item) => item.key).filter((key) => key !== 'seed');
+  // The seed is excluded from preset matching: varying it is a normal, encouraged
+  // action (what the Shuffle button does) and must not drop the look out of its
+  // named preset. Namespaced seeds count too -- the parametric engine's key is
+  // 'modulator.seed', so a plain `key !== 'seed'` would let seed changes mark a
+  // preset as "Custom".
+  const keys = family.schema
+    .map((item) => item.key)
+    .filter((key) => key !== 'seed' && !key.endsWith('.seed'));
   return family.variants.find((variant) => paramsEqual(variant.params, params, keys)) || null;
 }
 

@@ -170,7 +170,18 @@
           </div>
         {:else if field.type === 'seed'}
           <div class="seed-row">
-            <code>{params[field.key]}</code>
+            <!-- Editable so a seed can be typed back in to reproduce a result.
+                 Commits on change (blur / Enter) rather than on every keystroke,
+                 so typing a long seed does not re-render the pattern per digit. -->
+            <input
+              type="number"
+              min="1"
+              max="99999"
+              step="1"
+              value={params[field.key]}
+              aria-label={field.label}
+              on:change={(e) => set(field.key, Number(e.target.value) || 1)}
+            />
           </div>
         {/if}
       </div>
@@ -586,6 +597,31 @@
   .seed-row code {
     font-size: 12px;
     color: var(--text-dim);
+  }
+
+  .seed-row input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 5px 8px;
+    font: inherit;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+  }
+
+  .seed-row input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  /* A seed is an opaque handle, not a quantity -- hide the number spinners. */
+  .seed-row input::-webkit-outer-spin-button,
+  .seed-row input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
 
   .none-on {

@@ -183,9 +183,24 @@ run('C4 LookPanel 兼容 {value,label} 形式的 select 选项', () => {
   need(!/>\{option\}<\/button>/.test(s), 'select 分支仍在直接插值 option');
   // 引擎侧确认确实用的是对象形式（否则这条检查没有意义）
   const schema = readFileSync(join(ROOT, 'src/lib/parametric/schema.js'), 'utf8');
-  need(/label:\s*labels\?\.\[value\]/.test(schema) || /const opts = \(values, labels\)/.test(schema),
-    '引擎 schema 不再使用 {value,label} 形式，这条检查应重新评估');
+  need(/const opts = \(values, labels\)/.test(schema), '引擎 schema 不再使用 {value,label} 形式，这条检查应重新评估');
   return '两种选项形式都受支持';
+});
+
+run('C5 种子可输入 + 命名空间种子不破坏预设识别', () => {
+  const look = readFileSync(join(ROOT, 'src/components/LookPanel.svelte'), 'utf8');
+  // 种子必须可编辑（PRD 承诺"可输入种子复现"）
+  // Svelte adds a scoped class, so the attribute is "seed-row s-xxxxxxxxxx"
+  const seedRow = look.match(/class="seed-row[^"]*"[\s\S]{0,420}?<\/div>/);
+  need(seedRow, '找不到 seed-row 区块');
+  need(/<input/.test(seedRow[0]), '种子仍是只读展示，无法输入复现（PRD 要求可输入）');
+
+  // 命名空间种子要被排除在预设匹配之外，否则改种子会掉出预设身份变成 Custom
+  const cat = readFileSync(join(ROOT, 'src/catalog.js'), 'utf8');
+  const fn = cat.match(/export function matchingPreset[\s\S]*?\n}/);
+  need(fn, '找不到 matchingPreset');
+  need(/endsWith\('\.seed'\)/.test(fn[0]), "matchingPreset 没有排除命名空间种子（'modulator.seed' 之类）");
+  return '种子可输入，且改种子不会掉出预设';
 });
 
 console.log('\n【D. 构建】');
