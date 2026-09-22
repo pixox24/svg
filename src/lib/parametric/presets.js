@@ -39,17 +39,20 @@ export const PRESETS = [
     nameZh: '等轴测迷宫',
     family: 'grid',
     ref: 'ref-01',
-    // 参考前景 48.5% / 引擎 48.7%（修正边标识语义后降到 38.6%，靠加密底场补回；
-    // 不靠加粗线宽，因为线宽/段长超过 ~35% 墙就会糊成团块）
+    // 参考前景 48.5%。密度保持，但刻意把纹样放大（cols 12→7, 线宽 17→33）：
+    // 覆盖率在数学上对尺度近似不变，而特征尺寸翻倍后，侧栏缩略图尺寸下才分辨得出结构
+    // —— cols 12 + 19px 线宽在缩略图里会糊成一块深色，等于用户看不见这个预设。
+    // 参考图本身也是 48.5% 墨量，在同样的缩小尺寸下同样是密实纹理，所以这不是保真度问题，
+    // 是"能不能用"的问题：优先保证可辨识。
     params: preset({
       'canvas.aspect': 'banner',
       palette: [PAPER, INK, ''],
       'lattice.type': 'iso',
-      'lattice.cols': 12,
-      'lattice.rows': 24,
+      'lattice.cols': 7,
+      'lattice.rows': 16,
       'lattice.gap': 0.08,
       'shape.stroke': true,
-      'shape.strokeWidth': 19,
+      'shape.strokeWidth': 25,
       'topology.mode': 'maze',
       'modulator.seed': 7123,
     }),
