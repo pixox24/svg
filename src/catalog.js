@@ -42,82 +42,9 @@ export const TAGS = [
 
 export const families = [
   {
-    id: 'lattice',
-    label: 'Lattice',
-    blurb: 'A field of cells — pulsing, strict, or overgrown.',
-    tags: ['motion', 'pattern'],
-    ...systems.lattice,
-    variants: [
-      {
-        id: 'lattice-pulse',
-        name: 'Pulse',
-        params: {
-          colors: ['#e2b44c', '#c43c6e', '#5346b8'],
-          bg: PAPER,
-          grid: 10,
-          rMin: 0.08,
-          rMax: 0.44,
-          strokeWidth: 0.03,
-          opacity: 1,
-          motion: true,
-          speed: 2.2,
-          seed: 48291
-        }
-      },
-      {
-        id: 'lattice-monolith',
-        name: 'Monolith',
-        params: {
-          colors: ['#161412'],
-          bg: '#f4f0e8',
-          grid: 8,
-          rMin: 0.32,
-          rMax: 0.32,
-          strokeWidth: 0,
-          opacity: 1,
-          motion: false,
-          speed: 2,
-          seed: 1
-        }
-      },
-      {
-        id: 'lattice-noir',
-        name: 'Noir',
-        params: {
-          colors: ['#e2b87a', '#e2b87a', '#e2b87a', '#6b542e'],
-          bg: INK,
-          grid: 12,
-          rMin: 0.04,
-          rMax: 0.32,
-          strokeWidth: 0,
-          opacity: 1,
-          motion: false,
-          speed: 2,
-          seed: 90011
-        }
-      },
-      {
-        id: 'lattice-bloom',
-        name: 'Bloom',
-        params: {
-          colors: ['#ead3cf', '#d3c2e6', '#c5ddd6', '#f0d7a4'],
-          bg: '#f6f1ea',
-          grid: 6,
-          rMin: 0.42,
-          rMax: 0.95,
-          strokeWidth: 0,
-          opacity: 0.72,
-          motion: false,
-          speed: 2,
-          seed: 77102
-        }
-      }
-    ]
-  },
-  {
     id: 'marks',
     label: 'Marks',
-    blurb: 'One Lucide icon, tiled into a field — turned, recolored, reseeded.',
+    blurb: 'One icon, tiled into a field — line or solid, turned, recolored, reseeded.',
     tags: ['mark', 'pattern'],
     ...systems.marks,
     variants: [
@@ -130,8 +57,13 @@ export const families = [
           bg: PAPER,
           grid: 6,
           frequency: 1,
-          size: 0.58,
+          sizeMin: 0.42,
+          sizeMax: 0.74,
           strokeWidth: 1.8,
+          opacity: 1,
+          fill: false,
+          motion: false,
+          speed: 2,
           turn: true,
           seed: 48291
         }
@@ -145,8 +77,13 @@ export const families = [
           bg: '#f6f1ea',
           grid: 5,
           frequency: 1,
-          size: 0.62,
+          sizeMin: 0.46,
+          sizeMax: 0.8,
           strokeWidth: 1.7,
+          opacity: 1,
+          fill: false,
+          motion: false,
+          speed: 2,
           turn: false,
           seed: 22018
         }
@@ -160,8 +97,13 @@ export const families = [
           bg: INK,
           grid: 7,
           frequency: 1,
-          size: 0.52,
+          sizeMin: 0.36,
+          sizeMax: 0.68,
           strokeWidth: 1.6,
+          opacity: 1,
+          fill: false,
+          motion: false,
+          speed: 2,
           turn: true,
           seed: 90011
         }
@@ -175,10 +117,35 @@ export const families = [
           bg: INK,
           grid: 6,
           frequency: 0.6,
-          size: 0.48,
+          sizeMin: 0.28,
+          sizeMax: 0.64,
           strokeWidth: 1.9,
+          opacity: 1,
+          fill: false,
+          motion: false,
+          speed: 2,
           turn: true,
           seed: 77102
+        }
+      },
+      {
+        id: 'marks-solid',
+        name: 'Solid',
+        params: {
+          icon: 'filled:star',
+          colors: ['#c9a46c', '#8a5a2b', '#161412'],
+          bg: PAPER,
+          grid: 6,
+          frequency: 0.7,
+          sizeMin: 0.32,
+          sizeMax: 0.56,
+          strokeWidth: 1.6,
+          opacity: 1,
+          fill: false,
+          motion: false,
+          speed: 2,
+          turn: true,
+          seed: 31847
         }
       }
     ]

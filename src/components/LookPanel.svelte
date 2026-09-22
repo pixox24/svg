@@ -89,9 +89,25 @@
           </button>
         {:else if field.type === 'icon'}
           <div class="icon-picker">
+            <div class="icon-sets" role="group" aria-label="Icon style">
+              <button
+                type="button"
+                class="pill"
+                class:on={iconSet === 'line'}
+                aria-pressed={iconSet === 'line'}
+                on:click={() => pickSet('line')}
+              >Line</button>
+              <button
+                type="button"
+                class="pill"
+                class:on={iconSet === 'solid'}
+                aria-pressed={iconSet === 'solid'}
+                on:click={() => pickSet('solid')}
+              >Solid</button>
+            </div>
             <input
               type="search"
-              placeholder="Search Lucide icons"
+              placeholder="Search icons"
               bind:value={iconQuery}
             />
             <div class="icon-grid">
@@ -100,7 +116,7 @@
                   type="button"
                   class="mark-btn"
                   class:on={params[field.key] === icon.id}
-                  title={icon.name}
+                  title={icon.paint === 'fill' ? `${icon.name} · solid` : icon.name}
                   on:click={() => pickIcon(field.key, icon.id)}
                 >
                   {@html markPreview(icon.id)}
@@ -112,7 +128,7 @@
             {:else if !iconHits.length}
               <p class="icon-empty">No icons match.</p>
             {/if}
-            <p class="icon-credit">Icons by Lucide · ISC</p>
+            <p class="icon-credit">Lucide · ISC · Tabler filled · MIT</p>
           </div>
         {:else if field.type === 'seed'}
           <div class="seed-row">
@@ -126,7 +142,7 @@
 
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { MARKS, searchIconNames, ensureMark, markPreview, getMark } from '../lib/marks.js';
+  import { MARKS, FILLED_MARKS, searchIconNames, ensureMark, markPreview, getMark } from '../lib/marks.js';
 
   export let schema = [];
   export let params = {};
@@ -135,26 +151,44 @@
 
   const dispatch = createEventDispatcher();
   let iconQuery = '';
-  let iconHits = MARKS;
+  let iconSet = String(params.icon || '').startsWith('filled:') ? 'solid' : 'line';
+  let seenPaint = iconSet;
+  let iconHits = iconSet === 'solid' ? FILLED_MARKS : MARKS;
   let iconSearching = false;
   let searchGen = 0;
 
-  $: runIconSearch(iconQuery);
-
-  function iconName(id) {
-    return getMark(id).name;
+  $: {
+    const paint = String(params.icon || '').startsWith('filled:') ? 'solid' : 'line';
+    if (paint !== seenPaint) {
+      seenPaint = paint;
+      iconSet = paint;
+    }
   }
 
-  async function runIconSearch(query) {
+  $: runIconSearch(iconQuery, iconSet);
+
+  function pickSet(set) {
+    iconSet = set;
+  }
+
+  function iconName(id) {
+    const mark = getMark(id);
+    const name = mark.id === id
+      ? mark.name
+      : String(id || 'star').replace(/^filled:/, '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    return String(id || '').startsWith('filled:') ? `${name} · solid` : name;
+  }
+
+  async function runIconSearch(query, set) {
     const needle = String(query || '').trim();
     const gen = ++searchGen;
     if (!needle) {
-      iconHits = MARKS;
+      iconHits = set === 'solid' ? FILLED_MARKS : MARKS;
       iconSearching = false;
       return;
     }
     iconSearching = true;
-    const ids = searchIconNames(needle);
+    const ids = searchIconNames(needle, set);
     const loaded = await Promise.all(ids.map((id) => ensureMark(id)));
     if (gen !== searchGen) return;
     iconHits = loaded.filter((item, index, list) => item && list.findIndex((other) => other.id === item.id) === index);
@@ -352,6 +386,12 @@
 
   .none-on {
     color: var(--accent);
+  }
+
+  .icon-sets {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
   }
 
   .icon-picker input[type='search'] {
