@@ -166,6 +166,7 @@
   import { loadTabbiedFamily, warmupPatterns } from '../tabbiedCatalog.js';
   import { stageFromBg } from '../lib/rng.js';
   import { copyText, downloadFile, svgBlob, svgToPngBlob, frameSvg } from '../lib/export.js';
+  import { encodeParams as encodeEngineParams, decodeParams as decodeEngineParams } from '../lib/parametric/index.js';
   import {
     DEFAULT_CANVAS,
     DEFAULT_DPI,
@@ -438,6 +439,9 @@
 
   function updateUrl(id) {
     let query = new URLSearchParams(location.search);
+    // A parametric look travels as parameters (?p=). Drop them only when switching to a
+    // different sketch -- otherwise init() would erase the link it is restoring.
+    if (query.get('id') !== id) query.delete('p');
     query.set('id', id);
     query.delete('code');
     query.delete('name');
@@ -446,9 +450,24 @@
 
   function saveToURL() {
     let query = new URLSearchParams(location.search);
+    // The parametric engine compiles its parameters into a finished SVG document, so
+    // storing the compiled code would make a 10-15k character URL that any chat client
+    // or proxy truncates. The parameters themselves encode to a few hundred characters
+    // and reproduce the look exactly. If the source was hand-edited -- or for every
+    // other family -- fall through to storing the source, which is then the source of truth.
+    if (isParametric && !ejected) {
+      query.set('id', selectedId);
+      query.set('p', encodeEngineParams(params));
+      query.delete('code');
+      query.delete('name');
+      history.replaceState('', '', location.pathname + '?' + query.toString());
+      note('URL updated');
+      return;
+    }
     query.set('code', code);
     query.delete('id');
     query.delete('name');
+    query.delete('p');
     codeFromQuery = code;
     selectedId = 'other';
     history.replaceState('', '', location.pathname + '?' + query.toString());
@@ -545,6 +564,9 @@
     let query = new URLSearchParams(location.search);
     restoreCanvas(query);
     codeFromQuery = query.get('code');
+    // Read the parametric parameter payload before loadSketch runs: loadSketch calls
+    // updateUrl, which may normalise the query string.
+    const storedParams = query.get('p');
     const id = query.get('id') || query.get('name');
     if (codeFromQuery) {
       code = codeFromQuery;
@@ -555,6 +577,14 @@
       if (editor) editor.updateCode(code);
     } else {
       loadSketch(id || DEFAULT_ID);
+      // loadSketch resolves synchronously for non-tabbied sketches, so the family is
+      // ready here. Only parametric families understand a ?p= payload.
+      if (storedParams && family && family.kind === 'parametric') {
+        params = decodeEngineParams(storedParams);
+        code = family.compile(params);
+        ejected = false;
+        if (editor) editor.updateCode(code);
+      }
     }
   }
 
