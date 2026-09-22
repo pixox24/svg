@@ -87,7 +87,27 @@ const filledNames = new Set(FILLED_INDEX.map((item) => item[0]));
 const pending = new Map();
 let filledNodesPromise;
 
+export function adoptCustom(record) {
+  const mark = {
+    id: record.id,
+    name: record.name || 'Stamp',
+    tags: [],
+    paint: record.paint === 'fill' ? 'fill' : 'stroke',
+    source: 'custom',
+    data: { name: record.name || 'Stamp', node: record.node }
+  };
+  byId[mark.id] = mark;
+  return mark;
+}
+
+export function forgetCustom(id) {
+  const mark = byId[id];
+  if (mark && mark.source === 'custom') delete byId[id];
+}
+
 export function markPaint(id) {
+  const mark = byId[id];
+  if (mark && mark.paint) return mark.paint;
   return String(id || '').startsWith('filled:') ? 'fill' : 'stroke';
 }
 
