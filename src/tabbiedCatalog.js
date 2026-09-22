@@ -1,4 +1,7 @@
-import catalogJson from 'tabbied/catalog.json';
+// Node 22 要求 JSON 模块带导入属性，否则动态 import 直接抛
+// ERR_IMPORT_ATTRIBUTE_MISSING —— 这也是 npm run thumbs 在 Node 22 上
+// 静默跳过全部非 parametric family 的根因。Vite 4 同样接受这个写法。
+import catalogJson from 'tabbied/catalog.json' with { type: 'json' };
 import {
   buildDoodleSource,
   expandPalette,

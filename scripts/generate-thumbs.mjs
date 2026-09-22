@@ -63,7 +63,11 @@ try {
     }
   }
 } catch (error) {
-  console.warn(`warn: skipped catalog families (${error.message})`);
+  // 不要静默降级：加载不到 catalog 意味着除 parametric 之外的 family 全都没被重写，
+  // 而进程照样退 0，调用方会以为缩略图是完整的。计入 fail，让退出码说实话。
+  fail += 1;
+  console.error(`fail: could not load catalog families (${error.message})`);
+  console.error('      only parametric thumbs were regenerated; the others are untouched.');
 }
 
 console.log(`done: ${ok} thumbs, ${fail} failed`);
