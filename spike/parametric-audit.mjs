@@ -108,6 +108,55 @@ for (const preset of PRESETS) {
 }
 console.log(`\n低于 6% 覆盖率（可能太稀）或弧不连通的预设数: ${flagged}`);
 
+/* ── 设计意图断言：把"参考图的设计意图"写成可机械验证的判据 ──
+   这些判据替代了主观视觉评审 —— 每次问视觉模型都会得到含糊答案，
+   而这些不等式一跑就知道对不对。 */
+console.log('\n设计意图断言：');
+const intent = [];
+const assert = (name, ok, detail) => {
+  intent.push({ name, ok });
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${name}  ${detail}`);
+};
+
+{
+  // ref-01 等轴测迷宫：墙不能粗到把格子糊成团块
+  const p = PRESETS[0].params;
+  const unit = (500 / p['lattice.cols']) * (1 - p['lattice.gap']);
+  const ratio = p['shape.strokeWidth'] / unit;
+  assert('ref-01 线宽/段长 ≤ 35%（否则糊成团块）', ratio <= 0.35, `${(ratio * 100).toFixed(0)}%`);
+}
+{
+  // ref-02 圆脉：最大半径须超过半间距（重叠才能挤出星形负空间），
+  //           最小半径须明显小于半间距（中部才有缝隙）
+  const p = PRESETS[1].params;
+  const half = 500 / p['lattice.cols'] / 2;
+  const rMax = p['shape.sizeMax'] / 2;
+  const rMin = p['shape.sizeMin'] / 2;
+  assert('ref-02 两端有重叠（出星形）', rMax > half * 1.05, `r=${rMax.toFixed(1)} vs 半间距 ${half.toFixed(1)}`);
+  assert('ref-02 中部有缝隙（有节奏）', rMin < half * 0.82, `r=${rMin.toFixed(1)}`);
+}
+{
+  // ref-03 胶囊场：形状要接近单元尺寸才会"咬合"，否则是浮球感
+  const p = PRESETS[2].params;
+  const cell = 1000 / p['lattice.cols'];
+  assert('ref-03 形状接近咬合 ≥85% 单元', p['shape.sizeMax'] / cell >= 0.85, `${((p['shape.sizeMax'] / cell) * 100).toFixed(0)}%`);
+  assert('ref-03 最小形状不至于成点 ≥45%', p['shape.sizeMin'] / cell >= 0.45, `${((p['shape.sizeMin'] / cell) * 100).toFixed(0)}%`);
+}
+{
+  // ref-14 六角回纹：弧要够到邻居
+  const p = PRESETS[13].params;
+  const span = (1000 / p['lattice.cols']) * 0.866;
+  assert('ref-14 弧可达邻居 ≥85%', p['shape.sizeMax'] / span >= 0.85, `${(p['shape.sizeMax'] / span).toFixed(2)}`);
+}
+const intentFailed = intent.filter((x) => !x.ok).length;
+console.log(`\n设计意图断言: ${intent.length - intentFailed}/${intent.length} 通过`);
+
+// 把覆盖率导出成 JSON，供 spike/ref-density.py 做"参考图墨量 vs 引擎覆盖"比对
+writeFileSync(
+  join(OUT, 'coverage.json'),
+  JSON.stringify(Object.fromEntries(lines.map(({ preset, r }) => [preset.ref, +(r.coverage * 100).toFixed(1)])), null, 1),
+);
+
 // 大尺寸对照页：2 列，每格 ~470px
 const cards = lines.map(({ preset }) => {
   const r = generate(preset.params);

@@ -112,7 +112,8 @@ function truchet(cells, p, ctx, density, seed) {
 
 /**
  * 迷宫：在底场网格上跑 DFS 回溯生成完美迷宫，只画墙。
- * 仅对 grid / hex / iso 这类有 i,j 索引的底场生效。
+ * 墙体方向随底场变化，这点很重要 —— 参考图 #01 是**等轴测**迷宫
+ * （90°/60°/120° 三向线，Y 形节点），若一律画直角墙就完全不是那个东西了。
  */
 function maze(cells, p, ctx, density, seed) {
   const cols = Math.max(1, Math.round(clampNum(p['lattice.cols'], 1, 80)));
@@ -141,42 +142,76 @@ function maze(cells, p, ctx, density, seed) {
       stack.pop();
       continue;
     }
-    // 用确定性随机而不是 Math.random，保证同种子同结果
     const pickIdx = Math.min(neighbors.length - 1, Math.floor(rnd(ci * 13 + stack.length, cj * 7) * neighbors.length));
     const [ni, nj, di, dj] = neighbors[pickIdx];
     visited.add(key(ni, nj));
-    // 打通墙：记录被移除的墙
     walls.add(wallKey(ci, cj, di, dj));
     stack.push([ni, nj]);
   }
 
-  const out = [];
   const sw = clampNum(p['shape.strokeWidth'], 0.1, 200);
-  const useHex = p['lattice.type'] === 'hex';
-  const step = density;
+  const kind = p['lattice.type'];
+  const out = [];
 
-  for (let j = 0; j <= rows; j += 1) {
-    for (let i = 0; i <= cols; i += 1) {
-      const a = cellAt.get(key(Math.min(i, cols - 1), Math.min(j, rows - 1)));
-      if (!a) continue;
-      const ux = a.unit;
-      // 水平墙
-      if (j <= rows && !walls.has(wallKey(i, j - 1, 0, 1)) && j > 0 && i < cols) {
-        const x0 = a.x - ux / 2;
-        const y0 = a.y - ux / 2;
-        out.push(`<line x1="${r2(x0)}" y1="${r2(y0)}" x2="${r2(x0 + ux)}" y2="${r2(y0)}" stroke-width="${r2(sw)}"/>`);
+  for (const c of cells) {
+    const ux = Math.max(2, c.unit);
+    const X = r2(c.x);
+    const Y = r2(c.y);
+
+    if (kind === 'iso') {
+      // 等轴测三向骨架：竖直主干 + 两条 60° 斜枝（Y 形节点）
+      const half = ux * 0.5;
+      const dx60 = ux * 0.866;
+      // 竖直：与上/下相邻单元共享
+      if (!walls.has(wallKey(c.i, c.j, 0, -1))) {
+        out.push(`<line x1="${X}" y1="${r2(c.y - half)}" x2="${X}" y2="${r2(c.y + half)}" stroke-width="${r2(sw)}"/>`);
       }
-      // 垂直墙（六角底场用 60° 斜线）
-      if (i <= cols && !walls.has(wallKey(i - 1, j, 1, 0)) && i > 0 && j < rows) {
-        const x0 = a.x - ux / 2;
-        const y0 = a.y - ux / 2;
-        if (useHex) {
-          out.push(`<line x1="${r2(x0)}" y1="${r2(y0)}" x2="${r2(x0 + ux * 0.5)}" y2="${r2(y0 + ux * 0.866)}" stroke-width="${r2(sw)}"/>`);
-        } else {
-          out.push(`<line x1="${r2(x0)}" y1="${r2(y0)}" x2="${r2(x0)}" y2="${r2(y0 + ux)}" stroke-width="${r2(sw)}"/>`);
+      // 左下斜枝
+      if (!walls.has(wallKey(c.i, c.j, -1, 1))) {
+        out.push(`<line x1="${X}" y1="${r2(c.y + half)}" x2="${r2(c.x - dx60)}" y2="${r2(c.y + half * 2)}" stroke-width="${r2(sw)}"/>`);
+      }
+      // 右下斜枝
+      if (!walls.has(wallKey(c.i, c.j, 1, 1))) {
+        out.push(`<line x1="${X}" y1="${r2(c.y + half)}" x2="${r2(c.x + dx60)}" y2="${r2(c.y + half * 2)}" stroke-width="${r2(sw)}"/>`);
+      }
+      continue;
+    }
+
+    if (kind === 'hex') {
+      // 六角：六条边，按轴向邻居裁剪
+      const R = ux * 0.54;
+      const verts = [];
+      for (let k = 0; k < 6; k += 1) {
+        const a = (k * Math.PI) / 3;
+        verts.push([c.x + Math.cos(a) * R, c.y + Math.sin(a) * R]);
+      }
+      for (let k = 0; k < 6; k += 1) {
+        // 偶数索引边对应水平邻居，奇数索引对应斜向
+        const di = k === 0 ? 1 : k === 3 ? -1 : 0;
+        const dj = k === 0 || k === 3 ? 0 : (k < 3 ? 1 : -1);
+        if (di || dj) {
+          if (walls.has(wallKey(c.i, c.j, di, dj))) continue;
         }
+        const a = verts[k];
+        const b = verts[(k + 1) % 6];
+        out.push(`<line x1="${r2(a[0])}" y1="${r2(a[1])}" x2="${r2(b[0])}" y2="${r2(b[1])}" stroke-width="${r2(sw)}"/>`);
       }
-      void step;
+      continue;
+    }
+
+    // 直角网格：水平墙 + 垂直墙
+    const half = ux * 0.5;
+    if (!walls.has(wallKey(c.i, c.j, 1, 0))) {
+      out.push(`<line x1="${r2(c.x + half)}" y1="${r2(c.y - half)}" x2="${r2(c.x + half)}" y2="${r2(c.y + half)}" stroke-width="${r2(sw)}"/>`);
+    }
+    if (!walls.has(wallKey(c.i, c.j, 0, 1))) {
+      out.push(`<line x1="${r2(c.x - half)}" y1="${r2(c.y + half)}" x2="${r2(c.x + half)}" y2="${r2(c.y + half)}" stroke-width="${r2(sw)}"/>`);
+    }
+    if (c.i === 0 && !walls.has(wallKey(-1, c.j, 1, 0))) {
+      out.push(`<line x1="${r2(c.x - half)}" y1="${r2(c.y - half)}" x2="${r2(c.x - half)}" y2="${r2(c.y + half)}" stroke-width="${r2(sw)}"/>`);
+    }
+    if (c.j === 0 && !walls.has(wallKey(c.i, -1, 0, 1))) {
+      out.push(`<line x1="${r2(c.x - half)}" y1="${r2(c.y - half)}" x2="${r2(c.x + half)}" y2="${r2(c.y - half)}" stroke-width="${r2(sw)}"/>`);
     }
   }
   return out;

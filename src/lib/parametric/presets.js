@@ -4,7 +4,11 @@
  * 识别与分类见：docs/parametric-engine/01-reference-analysis.md
  *
  * 尺寸一律用像素（见 preset() 里钉死的 shape.scaleToUnit = false）。
- * 数值经过视觉验收迭代：密度偏低的组合已按"元素更大 / 网格更密"上调过。
+ *
+ * 数值标定方法（重要）：不靠主观视觉评审 —— 模型对缩略图的判断不可靠。
+ * 改用客观比对：spike/ref-density.py 量出每张参考图的"前景像素占比"，
+ * 再与引擎产出的覆盖率对齐（spike/parametric-audit.mjs 导出 coverage.json）。
+ * 覆盖率 ∝ 尺寸² 的图形按 sqrt(目标/当前) 换算，∝ 线宽的按线性换算。
  */
 
 import { defaults } from './schema.js';
@@ -28,14 +32,16 @@ export const PRESETS = [
     nameZh: '等轴测迷宫',
     family: 'grid',
     ref: 'ref-01',
+    // 参考前景 48.5% / 引擎 42.9% → 线宽线性上调
     params: preset({
       'canvas.aspect': 'banner',
       palette: [PAPER, INK, ''],
       'lattice.type': 'iso',
       'lattice.cols': 9,
       'lattice.rows': 22,
+      'lattice.gap': 0.08,
       'shape.stroke': true,
-      'shape.strokeWidth': 22,
+      'shape.strokeWidth': 17,
       'topology.mode': 'maze',
       'modulator.seed': 7123,
     }),
@@ -46,6 +52,7 @@ export const PRESETS = [
     nameZh: '圆脉',
     family: 'grid',
     ref: 'ref-02',
+    // 参考前景 84.3% / 引擎 82.7% → 已对齐
     params: preset({
       'canvas.aspect': 'banner',
       palette: [INK, '#ffffff', ''],
@@ -60,8 +67,8 @@ export const PRESETS = [
       'modulator.amp': 1,
       'modulator.bias': 0.5,
       'shape.type': 'dot',
-      'shape.sizeMin': 38,
-      'shape.sizeMax': 66,
+      'shape.sizeMin': 46,
+      'shape.sizeMax': 80,
     }),
   },
   {
@@ -70,6 +77,7 @@ export const PRESETS = [
     nameZh: '胶囊噪声场',
     family: 'grid',
     ref: 'ref-03',
+    // 参考前景 84.1% / 引擎 51.0% → 尺寸 ×1.28
     params: preset({
       palette: [INK, '#ffffff', ''],
       'lattice.type': 'grid',
@@ -82,8 +90,8 @@ export const PRESETS = [
       'modulator.bias': 0.5,
       'modulator.seed': 7,
       'shape.type': 'capsule',
-      'shape.sizeMin': 34,
-      'shape.sizeMax': 108,
+      'shape.sizeMin': 96,
+      'shape.sizeMax': 150,
       'shape.aspect': 1.9,
       'shape.aspectMode': 'modulated',
       'shape.corner': 1,
@@ -96,6 +104,7 @@ export const PRESETS = [
     nameZh: '曲边六角',
     family: 'hex',
     ref: 'ref-04',
+    // 参考前景 75.5% / 引擎 55.5% → 尺寸 ×1.17（曲边内凹会削掉约 20% 面积）
     params: preset({
       palette: [INK, '#ffffff', ''],
       'lattice.type': 'hex',
@@ -104,8 +113,8 @@ export const PRESETS = [
       'shape.type': 'curvePoly',
       'shape.sides': 6,
       'shape.curvature': 0.42,
-      'shape.sizeMin': 128,
-      'shape.sizeMax': 128,
+      'shape.sizeMin': 148,
+      'shape.sizeMax': 148,
     }),
   },
   {
@@ -114,6 +123,7 @@ export const PRESETS = [
     nameZh: '叶序螺旋',
     family: 'spiral',
     ref: 'ref-05',
+    // 参考前景 21.2% / 引擎 13.2% → 尺寸 ×1.27
     params: preset({
       palette: [PAPER, INK, ''],
       'lattice.type': 'phyllotaxis',
@@ -124,8 +134,8 @@ export const PRESETS = [
       'modulator.amp': 0.5,
       'modulator.bias': 0.5,
       'shape.type': 'dot',
-      'shape.sizeMin': 1.5,
-      'shape.sizeMax': 17,
+      'shape.sizeMin': 2,
+      'shape.sizeMax': 21,
     }),
   },
   {
@@ -134,6 +144,7 @@ export const PRESETS = [
     nameZh: '对角编织',
     family: 'grid',
     ref: 'ref-06',
+    // 参考前景 54.5% / 引擎 34.4% → 线宽线性上调 12→19
     params: preset({
       'canvas.aspect': 'banner',
       palette: [PAPER, INK, ''],
@@ -147,7 +158,7 @@ export const PRESETS = [
       'shape.rotation': 45,
       'shape.rotMode': 'alternate',
       'shape.stroke': true,
-      'shape.strokeWidth': 12,
+      'shape.strokeWidth': 19,
     }),
   },
   {
@@ -156,6 +167,7 @@ export const PRESETS = [
     nameZh: '正弦扭曲',
     family: 'grid',
     ref: 'ref-07',
+    // 参考前景 10.9% / 引擎 13.3% → 尺寸 ×0.82
     params: preset({
       'canvas.aspect': 'photo',
       palette: [INK, '#ffffff', ''],
@@ -165,8 +177,8 @@ export const PRESETS = [
       'topology.warp': 0.55,
       'topology.warpFreq': 2.4,
       'shape.type': 'dot',
-      'shape.sizeMin': 20,
-      'shape.sizeMax': 42,
+      'shape.sizeMin': 16,
+      'shape.sizeMax': 34,
     }),
   },
   {
@@ -175,6 +187,7 @@ export const PRESETS = [
     nameZh: '极坐标螺旋',
     family: 'spiral',
     ref: 'ref-08',
+    // 参考前景 6.2% / 引擎 10.7% → 尺寸 ×0.76
     params: preset({
       'canvas.aspect': 'portrait',
       palette: [INK, ORANGE, ''],
@@ -187,8 +200,8 @@ export const PRESETS = [
       'modulator.amp': 0.5,
       'modulator.bias': 0.45,
       'shape.type': 'dot',
-      'shape.sizeMin': 3,
-      'shape.sizeMax': 34,
+      'shape.sizeMin': 2,
+      'shape.sizeMax': 26,
     }),
   },
   {
@@ -197,6 +210,7 @@ export const PRESETS = [
     nameZh: '正弦编织',
     family: 'grid',
     ref: 'ref-09',
+    // 参考前景 25.9% / 引擎 7.8% → 尺寸 ×1.82
     params: preset({
       'canvas.aspect': 'photo',
       palette: [INK, '#ffffff', ''],
@@ -209,8 +223,8 @@ export const PRESETS = [
       'modulator.amp': 1,
       'modulator.bias': 0.5,
       'shape.type': 'dot',
-      'shape.sizeMin': 9,
-      'shape.sizeMax': 27,
+      'shape.sizeMin': 16,
+      'shape.sizeMax': 48,
     }),
   },
   {
@@ -219,6 +233,7 @@ export const PRESETS = [
     nameZh: '消散网格',
     family: 'grid',
     ref: 'ref-10',
+    // 参考前景 31.4% / 引擎 37.2% → 尺寸 ×0.84
     params: preset({
       'canvas.aspect': 'tall',
       palette: [PAPER, INK, ''],
@@ -232,8 +247,8 @@ export const PRESETS = [
       'shape.type': 'polygon',
       'shape.sides': 3,
       'shape.corner': 0.3,
-      'shape.sizeMin': 16,
-      'shape.sizeMax': 72,
+      'shape.sizeMin': 14,
+      'shape.sizeMax': 62,
       'topology.jitter': 0.15,
       'topology.warp': 0.22,
       'topology.warpFreq': 1.2,
@@ -246,6 +261,7 @@ export const PRESETS = [
     nameZh: '六角点阵簇',
     family: 'hex',
     ref: 'ref-11',
+    // 参考前景 29.5% / 引擎 89.3% → 尺寸 ×0.58（此前密到几乎糊成一片）
     params: preset({
       palette: [PAPER, INK, ''],
       'lattice.type': 'cluster',
@@ -254,8 +270,8 @@ export const PRESETS = [
       'lattice.clusterSize': 4,
       'lattice.clusterSpread': 2.35,
       'shape.type': 'dot',
-      'shape.sizeMin': 22,
-      'shape.sizeMax': 22,
+      'shape.sizeMin': 12.5,
+      'shape.sizeMax': 12.5,
     }),
   },
   {
@@ -264,6 +280,7 @@ export const PRESETS = [
     nameZh: '六角三角阵列',
     family: 'hex',
     ref: 'ref-12',
+    // 参考前景 24.2% / 引擎 15.9% → 尺寸 ×1.23
     params: preset({
       'canvas.aspect': 'portrait',
       palette: [PAPER, INK, ''],
@@ -278,8 +295,8 @@ export const PRESETS = [
       'shape.sides': 3,
       'shape.corner': 0.34,
       'shape.rotMode': 'radial',
-      'shape.sizeMin': 24,
-      'shape.sizeMax': 118,
+      'shape.sizeMin': 26,
+      'shape.sizeMax': 142,
     }),
   },
   {
@@ -288,6 +305,7 @@ export const PRESETS = [
     nameZh: '螺旋陈列',
     family: 'spiral',
     ref: 'ref-13',
+    // 参考前景 19.4% / 引擎 10.8% → 尺寸 ×1.34
     params: preset({
       palette: [PAPER, INK, ''],
       'lattice.type': 'phyllotaxis',
@@ -296,8 +314,8 @@ export const PRESETS = [
       'shape.type': 'ellipse',
       'shape.aspect': 2.6,
       'shape.rotMode': 'tangent',
-      'shape.sizeMin': 2,
-      'shape.sizeMax': 26,
+      'shape.sizeMin': 2.7,
+      'shape.sizeMax': 34,
     }),
   },
   {
@@ -306,6 +324,7 @@ export const PRESETS = [
     nameZh: '六角回纹',
     family: 'hex',
     ref: 'ref-14',
+    // 参考前景 35.2% / 引擎 18.4% → 线宽 ×1.57 + 尺寸 ×1.07
     params: preset({
       'canvas.aspect': 'portrait',
       palette: [PAPER, INK, ''],
@@ -314,10 +333,10 @@ export const PRESETS = [
       'lattice.rows': 14,
       'shape.type': 'arc',
       'shape.sweep': 0.72,
-      'shape.sizeMin': 122,
-      'shape.sizeMax': 122,
+      'shape.sizeMin': 130,
+      'shape.sizeMax': 130,
       'shape.stroke': true,
-      'shape.strokeWidth': 28,
+      'shape.strokeWidth': 44,
       'topology.mode': 'truchet',
       'topology.density': 0.95,
       'modulator.seed': 11,
