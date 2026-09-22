@@ -159,20 +159,27 @@ function maze(cells, p, ctx, density, seed) {
     const Y = r2(c.y);
 
     if (kind === 'iso') {
-      // 等轴测三向骨架：竖直主干 + 两条 60° 斜枝（Y 形节点）
+      // 等轴测三向骨架：竖直主干 + 两条 60° 斜枝（Y 形节点）。
+      //
+      // 注意边标识的语义必须与几何一致。早期版本用 wallKey(i, j, -1, 1) 判斜枝，
+      // 而该函数对 di=-1 返回 `${i-1},${j}|v` —— 与"左邻居通道"是同一个键，
+      // 于是"某个方向打通"会拆掉"另一个方向的墙"，整张图退化成 incoherent 的噪声。
+      // 现在只按真实共享关系判断：竖直段由上下通道决定，两条斜枝分别由左右通道决定。
       const half = ux * 0.5;
       const dx60 = ux * 0.866;
-      // 竖直：与上/下相邻单元共享
-      if (!walls.has(wallKey(c.i, c.j, 0, -1))) {
+      const up = walls.has(wallKey(c.i, c.j, 0, -1));
+      const down = walls.has(wallKey(c.i, c.j, 0, 1));
+      const left = walls.has(wallKey(c.i, c.j, -1, 0));
+      const right = walls.has(wallKey(c.i, c.j, 1, 0));
+      if (!up && !down) {
         out.push(`<line x1="${X}" y1="${r2(c.y - half)}" x2="${X}" y2="${r2(c.y + half)}" stroke-width="${r2(sw)}"/>`);
       }
-      // 左下斜枝
-      if (!walls.has(wallKey(c.i, c.j, -1, 1))) {
-        out.push(`<line x1="${X}" y1="${r2(c.y + half)}" x2="${r2(c.x - dx60)}" y2="${r2(c.y + half * 2)}" stroke-width="${r2(sw)}"/>`);
+      const footY = r2(c.y + half);
+      if (!left) {
+        out.push(`<line x1="${X}" y1="${footY}" x2="${r2(c.x - dx60)}" y2="${r2(c.y + half * 2)}" stroke-width="${r2(sw)}"/>`);
       }
-      // 右下斜枝
-      if (!walls.has(wallKey(c.i, c.j, 1, 1))) {
-        out.push(`<line x1="${X}" y1="${r2(c.y + half)}" x2="${r2(c.x + dx60)}" y2="${r2(c.y + half * 2)}" stroke-width="${r2(sw)}"/>`);
+      if (!right) {
+        out.push(`<line x1="${X}" y1="${footY}" x2="${r2(c.x + dx60)}" y2="${r2(c.y + half * 2)}" stroke-width="${r2(sw)}"/>`);
       }
       continue;
     }

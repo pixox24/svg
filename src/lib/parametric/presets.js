@@ -39,16 +39,17 @@ export const PRESETS = [
     nameZh: '等轴测迷宫',
     family: 'grid',
     ref: 'ref-01',
-    // 参考前景 48.5% / 引擎 42.9% → 线宽线性上调
+    // 参考前景 48.5% / 引擎 48.7%（修正边标识语义后降到 38.6%，靠加密底场补回；
+    // 不靠加粗线宽，因为线宽/段长超过 ~35% 墙就会糊成团块）
     params: preset({
       'canvas.aspect': 'banner',
       palette: [PAPER, INK, ''],
       'lattice.type': 'iso',
-      'lattice.cols': 9,
-      'lattice.rows': 22,
+      'lattice.cols': 12,
+      'lattice.rows': 24,
       'lattice.gap': 0.08,
       'shape.stroke': true,
-      'shape.strokeWidth': 17,
+      'shape.strokeWidth': 19,
       'topology.mode': 'maze',
       'modulator.seed': 7123,
     }),

@@ -189,18 +189,23 @@ run('C4 LookPanel 兼容 {value,label} 形式的 select 选项', () => {
 
 run('C5 种子可输入 + 命名空间种子不破坏预设识别', () => {
   const look = readFileSync(join(ROOT, 'src/components/LookPanel.svelte'), 'utf8');
-  // 种子必须可编辑（PRD 承诺"可输入种子复现"）
-  // Svelte adds a scoped class, so the attribute is "seed-row s-xxxxxxxxxx"
-  const seedRow = look.match(/class="seed-row[^"]*"[\s\S]{0,420}?<\/div>/);
-  need(seedRow, '找不到 seed-row 区块');
-  need(/<input/.test(seedRow[0]), '种子仍是只读展示，无法输入复现（PRD 要求可输入）');
+  // 结构化提取 seed 控件分支。
+  // 注意 'field.type === \'seed\'' 在文件里出现两次：一处在 label-row 里显示数值，
+  // 另一处才是真正的控件。控件那处在后面，所以用 lastIndexOf。
+  const start = look.lastIndexOf("field.type === 'seed'");
+  need(start >= 0, "找不到 field.type === 'seed' 分支");
+  const end = look.indexOf('{/if}', start);
+  need(end > start, 'seed 分支没有闭合');
+  const branch = look.slice(start, end);
+  need(/<input/.test(branch), '种子仍是只读展示，无法输入复现（PRD 要求可输入）');
+  need(/on:change=/.test(branch), '种子输入没有在 change 时提交（会逐键重绘）');
 
   // 命名空间种子要被排除在预设匹配之外，否则改种子会掉出预设身份变成 Custom
   const cat = readFileSync(join(ROOT, 'src/catalog.js'), 'utf8');
   const fn = cat.match(/export function matchingPreset[\s\S]*?\n}/);
   need(fn, '找不到 matchingPreset');
   need(/endsWith\('\.seed'\)/.test(fn[0]), "matchingPreset 没有排除命名空间种子（'modulator.seed' 之类）");
-  return '种子可输入，且改种子不会掉出预设';
+  return '种子可输入（change 提交），且改种子不会掉出预设';
 });
 
 console.log('\n【D. 构建】');

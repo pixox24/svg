@@ -119,11 +119,14 @@ const assert = (name, ok, detail) => {
 };
 
 {
-  // ref-01 等轴测迷宫：墙不能粗到把格子糊成团块
+  // ref-01 等轴测迷宫：参考图的实际比例是"线宽 ≈ 间距（1:1）"（见 01-reference-analysis.md）。
+  // 所以这里不是"越细越好"，而是要求落在这个比例带内：
+  //   低于 0.30 太细（失去参考图的厚重感），高于 0.62 相邻墙会连成一团（曾经的实际 bug：
+  //   当时 3 长段/格 + 61% 比例 → 视觉上糊成有机团块）。
   const p = PRESETS[0].params;
   const unit = (500 / p['lattice.cols']) * (1 - p['lattice.gap']);
   const ratio = p['shape.strokeWidth'] / unit;
-  assert('ref-01 线宽/段长 ≤ 35%（否则糊成团块）', ratio <= 0.35, `${(ratio * 100).toFixed(0)}%`);
+  assert('ref-01 线宽/间距落在 0.30~0.62（参考图为 1:1）', ratio >= 0.30 && ratio <= 0.62, `${(ratio * 100).toFixed(0)}%`);
 }
 {
   // ref-02 圆脉：最大半径须超过半间距（重叠才能挤出星形负空间），
