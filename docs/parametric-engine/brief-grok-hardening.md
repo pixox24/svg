@@ -77,7 +77,9 @@ presets.js:   PRESETS, PRESET_BY_ID
 1. `node --test src/lib/parametric/parametric.test.mjs` → 全文输出，必须 0 fail
 2. `node spike/parametric-smoke.mjs` → 全文输出，退出码 0
 3. `grep -rn "from '[^.]" src/lib/parametric/` → 必须为空（证明零 npm 依赖）
-4. `npm run build` → 必须成功（证明没弄坏构建）
+4. `node -e "import('./src/lib/parametric/index.js').then(m=>console.log(JSON.stringify(m.selfCheck())))"` → 必须 ok:true
+
+⚠️ **不要运行 `npm run build` / `npm run dev`** —— 另一个 agent 正在并行做集成，同时构建会争抢 `.svelte-kit/` 输出目录。引擎是纯 JS，`node --test` 就是充分验证。
 
 ## 报告契约
 最终回复里给出：
