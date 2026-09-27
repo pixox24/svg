@@ -158,13 +158,17 @@ run('C2b 14 个缩略图实体存在且是合法 SVG', () => {
 });
 
 run('C2c 预渲染产物里侧栏真的列出了 parametric', () => {
-  // 用构建产物验证「集成真的生效了」。这比在 Node 里 import catalog.js 更强 ——
-  // 后者会撞上仓库既有的 tabbied JSON 导入问题（与本次改动无关）。
+  // 用构建产物验证「集成真的生效了」。这比在 Node 里 import catalog.js 更强。
   const html = readFileSync(join(ROOT, 'build/index.html'), 'utf8');
   need(/parametric/i.test(html), 'build/index.html 里没有 parametric');
-  need(html.includes('p-iso-maze'), '侧栏没有引用 p-iso-maze 缩略图');
-  need(html.includes('等轴测迷宫') || html.includes('Iso Maze'), '侧栏没有列出预设名称');
-  return '预渲染 HTML 含 family 与缩略图引用';
+  // 预设 id 与名称从引擎动态取，不硬编码 —— 之前把中文名写死成"等轴测迷宫"，
+  // 预设一改名这条检查就假失败（东西是好的，检查过期了）。
+  const info = JSON.parse(sh(`node -e "import('./src/lib/parametric/index.js').then(m=>console.log(JSON.stringify({id:m.PRESETS[0].id,nameZh:m.PRESETS[0].nameZh,name:m.PRESETS[0].name,all:m.PRESETS.map(p=>p.id)})))"`).trim());
+  need(html.includes(info.id), `侧栏没有引用 ${info.id} 缩略图`);
+  need(html.includes(info.nameZh) || html.includes(info.name), `侧栏没有列出预设名称 ${info.nameZh}`);
+  const missing = info.all.filter((id) => !existsSync(join(ROOT, 'static/thumbs', `${id}.svg`)));
+  need(!missing.length, `缺少缩略图：${missing.join(', ')}`);
+  return `预渲染 HTML 含 family 与 ${info.nameZh}；14 个预设缩略图齐全`;
 });
 
 run('C3 +page.svelte 有 parametric 渲染分支', () => {
