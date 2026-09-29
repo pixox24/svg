@@ -1,7 +1,7 @@
 import { randomSeed, stageFromBg, evenCells, mulberry32 } from './lib/rng.js';
 import { markDoodle, markPaint } from './lib/marks.js';
 import {
-  toSvg as engineSvg,
+  generate as engineGenerate,
   SCHEMA as ENGINE_SCHEMA,
   randomize as engineRandomize,
   randomSeed as engineSeed
@@ -524,7 +524,14 @@ export const tide = {
  */
 export const parametric = {
   schema: ENGINE_SCHEMA,
-  compile: (params) => engineSvg(params),
+  // compile() 之后可在 lastWarnings 读到本次告警（渲染失败 / 一个元素都没出），
+  // 供页面提示用；返回值仍是纯 SVG 字符串，不改 systems 的 compile 契约。
+  lastWarnings: [],
+  compile(params) {
+    const r = engineGenerate(params);
+    parametric.lastWarnings = r.warnings;
+    return r.svg;
+  },
   shuffle: (params) => engineRandomize(params, engineSeed())
 };
 

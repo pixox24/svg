@@ -7,9 +7,9 @@
 
 import { cellRandom, evaluate } from './modulator.js';
 import { fbm } from './hash.js';
-import { build } from './primitive.js';
+import { build, sizeAt } from './primitive.js';
 import { clampNum } from './lattice.js';
-import { canvasSize } from './compose.js';
+import { canvasSize, esc } from './compose.js';
 
 const r2 = (n) => Math.round(n * 100) / 100;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -42,7 +42,6 @@ export function apply(cells, p, ctx) {
       return latticeWalls(work, p, ctx, density, seed);
     case 'halftone':
       return halftone(work, p, ctx, seed);
-    case 'invert':
     case 'isolated':
     default:
       return plain(work, p, ctx, seed);
@@ -67,12 +66,23 @@ function jitterCell(c, amount, seed) {
   return { ...c, x: c.x + jx, y: c.y + jy };
 }
 
+/**
+ * 强调色：palette[2] 只点缀一部分单元（确定性散布），不再是整片覆盖主色。
+ * ponytail: 散布比例固定 28%；要可调比例时再加滑杆。
+ */
+function tint(c, frag, p, seed) {
+  const accent = Array.isArray(p.palette) ? p.palette[2] : '';
+  if (!accent || cellRandom(c, seed + 4242) < 0.72) return frag;
+  const painting = !!p['shape.stroke'] || ['truchet', 'maze', 'lattice'].includes(p['topology.mode']);
+  return `<g ${painting ? 'stroke' : 'fill'}="${esc(accent)}">${frag}</g>`;
+}
+
 function plain(cells, p, ctx, seed) {
   const out = [];
   for (const c of cells) {
     const m = evaluate(c, p);
     const frag = build(c, m, p, seed);
-    if (frag) out.push(frag);
+    if (frag) out.push(tint(c, frag, p, seed));
   }
   return out;
 }
@@ -86,7 +96,7 @@ function halftone(cells, p, ctx, seed) {
     const m = evaluate(c, p);
     const q = Math.round(m * (levels - 1)) / (levels - 1);
     const frag = build(c, q, p, seed);
-    if (frag) out.push(frag);
+    if (frag) out.push(tint(c, frag, p, seed));
   }
   return out;
 }
@@ -95,23 +105,18 @@ function halftone(cells, p, ctx, seed) {
 function truchet(cells, p, ctx, density, seed) {
   const out = [];
   const tp = { ...p, 'shape.type': 'arc' };
-  const size = clampNum(p['shape.sizeMax'], 1, 4000) || 20;
-  tp['shape.strokeWidth'] = clampNum(p['shape.strokeWidth'], 0.1, 200);
   for (const c of cells) {
     const rv = cellRandom(c, seed);
     if (rv > density * 1.15 + 0.1) continue;
     const flip = cellRandom({ i: c.i + 31, j: c.j + 17 }, seed) > 0.5;
-    const rot = flip ? Math.PI / 2 : 0;
-    const local = { ...c };
-    const frag = build(local, 0, {
+    const m = evaluate(c, p);
+    // 翻转决定弧的朝向，用户的旋转角叠加其上（rotation=0 时与旧实现一致）。
+    // 尺寸与弧度交给 build()：sizeMin/sizeMax 随调制变化，sweep 用调参面板的值。
+    const frag = build(c, m, {
       ...tp,
-      'shape.sizeMin': size,
-      'shape.sizeMax': size,
-      'shape.rotMode': 'grid',
-      'shape.rotation': (rot * 180) / Math.PI,
-      'shape.sweep': 0.5,
+      'shape.rotation': (clampNum(p['shape.rotation'], 0, 360) + (flip ? 90 : 0)) % 360,
     }, seed);
-    if (frag) out.push(frag);
+    if (frag) out.push(tint(c, frag, p, seed));
   }
   return out;
 }
@@ -148,8 +153,11 @@ function hexWallNetwork(cells, p, density, seed, withMaze) {
   const cols = Math.max(1, Math.round(clampNum(p['lattice.cols'], 1, 80)));
   const dx = w / cols;
   const halfEdge = dx / (2 * Math.sqrt(3)); // 六边形边长的一半
-  const sw = clampNum(p['shape.strokeWidth'], 0.1, 200);
   if (!cells.length) return [];
+  // 墙厚 = 尺寸（sizeAt），于是 sizeMin/sizeMax 与调制在墙模式下真正生效；
+  // 线宽滑杆只属于 truchet / 描边基元（见 schema 的 showIf）。
+  const thickAt = (c) => clampNum(sizeAt(evaluate(c, p), p, c), 0.1, 200);
+  const maxThick = clampNum(sizeAt(1, p, cells[0]), 0.1, 200);
 
   const cellAt = new Map();
   for (const c of cells) cellAt.set(`${c.i},${c.j}`, c);
@@ -212,7 +220,7 @@ function hexWallNetwork(cells, p, density, seed, withMaze) {
 
   const out = [];
   const emitted = new Set();
-  const margin = sw * 0.5 + 1;
+  const margin = maxThick * 0.5 + 1;
   for (const c of cells) {
     for (const [di, dj] of offsets(c.j)) {
       const other = cellAt.get(kk(c.i + di, c.j + dj));
@@ -234,7 +242,7 @@ function hexWallNetwork(cells, p, density, seed, withMaze) {
       const y2 = my - py;
       if (x1 < margin || x1 > w - margin || x2 < margin || x2 > w - margin) continue;
       if (y1 < margin || y1 > h - margin || y2 < margin || y2 > h - margin) continue;
-      out.push(`<line x1="${r2(x1)}" y1="${r2(y1)}" x2="${r2(x2)}" y2="${r2(y2)}" stroke-width="${r2(sw)}"/>`);
+      out.push(tint(c, `<line x1="${r2(x1)}" y1="${r2(y1)}" x2="${r2(x2)}" y2="${r2(y2)}" stroke-width="${r2(thickAt(c))}"/>`, p, seed));
     }
   }
   return out;
@@ -293,27 +301,28 @@ function maze(cells, p, ctx, density, seed) {
     stack.push([ni, nj]);
   }
 
-  const sw = clampNum(p['shape.strokeWidth'], 0.1, 200);
+  // 墙厚 = 尺寸（sizeAt），见 hexWallNetwork 的说明。
+  const thickAt = (c) => clampNum(sizeAt(evaluate(c, p), p, c), 0.1, 200);
   const out = [];
+  const emit = (c, frag) => out.push(tint(c, frag, p, seed));
 
   for (const c of cells) {
     const ux = Math.max(2, c.unit);
-    const X = r2(c.x);
-    const Y = r2(c.y);
+    const sw = r2(thickAt(c));
 
     // 直角网格：水平墙 + 垂直墙
     const half = ux * 0.5;
     if (!walls.has(wallKey(c.i, c.j, 1, 0))) {
-      out.push(`<line x1="${r2(c.x + half)}" y1="${r2(c.y - half)}" x2="${r2(c.x + half)}" y2="${r2(c.y + half)}" stroke-width="${r2(sw)}"/>`);
+      emit(c, `<line x1="${r2(c.x + half)}" y1="${r2(c.y - half)}" x2="${r2(c.x + half)}" y2="${r2(c.y + half)}" stroke-width="${sw}"/>`);
     }
     if (!walls.has(wallKey(c.i, c.j, 0, 1))) {
-      out.push(`<line x1="${r2(c.x - half)}" y1="${r2(c.y + half)}" x2="${r2(c.x + half)}" y2="${r2(c.y + half)}" stroke-width="${r2(sw)}"/>`);
+      emit(c, `<line x1="${r2(c.x - half)}" y1="${r2(c.y + half)}" x2="${r2(c.x + half)}" y2="${r2(c.y + half)}" stroke-width="${sw}"/>`);
     }
     if (c.i === 0 && !walls.has(wallKey(-1, c.j, 1, 0))) {
-      out.push(`<line x1="${r2(c.x - half)}" y1="${r2(c.y - half)}" x2="${r2(c.x - half)}" y2="${r2(c.y + half)}" stroke-width="${r2(sw)}"/>`);
+      emit(c, `<line x1="${r2(c.x - half)}" y1="${r2(c.y - half)}" x2="${r2(c.x - half)}" y2="${r2(c.y + half)}" stroke-width="${sw}"/>`);
     }
     if (c.j === 0 && !walls.has(wallKey(c.i, -1, 0, 1))) {
-      out.push(`<line x1="${r2(c.x - half)}" y1="${r2(c.y - half)}" x2="${r2(c.x + half)}" y2="${r2(c.y - half)}" stroke-width="${r2(sw)}"/>`);
+      emit(c, `<line x1="${r2(c.x - half)}" y1="${r2(c.y - half)}" x2="${r2(c.x + half)}" y2="${r2(c.y - half)}" stroke-width="${sw}"/>`);
     }
   }
   return out;
@@ -326,4 +335,4 @@ function wallKey(i, j, di, dj) {
   return `${i},${j - 1}|h`;
 }
 
-export const TOPOLOGIES = ['isolated', 'truchet', 'maze', 'lattice', 'invert', 'halftone'];
+export const TOPOLOGIES = ['isolated', 'truchet', 'maze', 'lattice', 'halftone'];

@@ -32,10 +32,12 @@ const SHAPE_LABELS = {
   polygon: '多边形', curvePoly: '曲边多边形', arc: '弧', ring: '圆环',
 };
 const ROT_LABELS = { none: '固定', grid: '跟随底场', alternate: '交替', tangent: '切线', radial: '径向', noise: '扰动' };
-const TOPO_LABELS = { isolated: '独立', truchet: '特鲁谢连通', maze: '迷宫', lattice: '织网', halftone: '半调', invert: '反相' };
+const TOPO_LABELS = { isolated: '独立', truchet: '特鲁谢连通', maze: '迷宫', lattice: '织网', halftone: '半调' };
 const ASPECT_LABELS = { square: '正方', portrait: '竖版', photo: '4:5', tall: '长条', banner: '海报条', landscape: '横版', wide: '宽幅' };
 
 const isOneOf = (key, list) => (p) => list.includes(p[key]);
+// 墙类拓扑：图形即墙，基元选择/描边开关/旋转对墙无意义，交给 showIf 藏掉。
+const isWall = (p) => ['truchet', 'maze', 'lattice'].includes(p['topology.mode']);
 
 export const SCHEMA = [
   { key: 'canvas.aspect', type: 'select', label: '画幅', options: opts(Object.keys(ASPECTS), ASPECT_LABELS) },
@@ -46,8 +48,8 @@ export const SCHEMA = [
   { key: 'lattice.type', type: 'select', label: '底场', options: opts(Object.keys(LATTICES), LATTICE_LABELS) },
   { key: 'lattice.cols', type: 'range', label: '列数', min: 1, max: 40, step: 1,
     showIf: isOneOf('lattice.type', ['grid', 'hex', 'iso', 'oblique', 'cluster']) },
-  { key: 'lattice.rows', type: 'range', label: '行数', min: 1, max: 40, step: 1,
-    showIf: isOneOf('lattice.type', ['grid', 'hex', 'iso', 'oblique', 'cluster']) },
+  { key: 'lattice.rows', type: 'range', label: '行数 / 环数', min: 1, max: 40, step: 1,
+    showIf: isOneOf('lattice.type', ['grid', 'hex', 'iso', 'oblique', 'cluster', 'ring']) },
   { key: 'lattice.gap', type: 'range', label: '单元间隙', min: -0.9, max: 0.9, step: 0.01,
     showIf: isOneOf('lattice.type', ['grid', 'hex', 'iso', 'oblique']) },
   { key: 'lattice.angle', type: 'range', label: '底场旋转', min: 0, max: 360, step: 1,
@@ -55,7 +57,7 @@ export const SCHEMA = [
   { key: 'lattice.skew', type: 'range', label: '斜切', min: -60, max: 60, step: 1,
     showIf: isOneOf('lattice.type', ['oblique']) },
   { key: 'lattice.count', type: 'range', label: '点数', min: 20, max: 4000, step: 10,
-    showIf: isOneOf('lattice.type', ['phyllotaxis', 'spiral']) },
+    showIf: isOneOf('lattice.type', ['phyllotaxis', 'spiral', 'ring']) },
   { key: 'lattice.turns', type: 'range', label: '圈数', min: 0.5, max: 20, step: 0.1,
     showIf: isOneOf('lattice.type', ['spiral']) },
   { key: 'lattice.spiralKind', type: 'select', label: '螺线类型',
@@ -81,7 +83,8 @@ export const SCHEMA = [
   { key: 'modulator.invert', type: 'toggle', label: '调制反转',
     showIf: (p) => p['modulator.type'] !== 'none' },
 
-  { key: 'shape.type', type: 'select', label: '基元', options: opts(SHAPES, SHAPE_LABELS) },
+  { key: 'shape.type', type: 'select', label: '基元', options: opts(SHAPES, SHAPE_LABELS),
+    showIf: (p) => !isWall(p) },
   { key: 'shape.scaleToUnit', type: 'toggle', label: '尺寸随单元缩放' },
   { key: 'shape.sizeMin', type: 'range', label: '最小尺寸', min: 0, max: 200, step: 0.5 },
   { key: 'shape.sizeMax', type: 'range', label: '最大尺寸', min: 0, max: 200, step: 0.5 },
@@ -97,12 +100,18 @@ export const SCHEMA = [
   { key: 'shape.curvature', type: 'range', label: '边曲率', min: -0.9, max: 0.9, step: 0.01,
     showIf: isOneOf('shape.type', ['curvePoly']) },
   { key: 'shape.sweep', type: 'range', label: '弧度', min: 0.05, max: 0.99, step: 0.01,
-    showIf: isOneOf('shape.type', ['arc']) },
-  { key: 'shape.rotation', type: 'range', label: '旋转', min: 0, max: 360, step: 1 },
-  { key: 'shape.rotMode', type: 'select', label: '旋转模式', options: opts(ROT_MODES, ROT_LABELS) },
-  { key: 'shape.stroke', type: 'toggle', label: '描边模式' },
+    showIf: (p) => p['topology.mode'] === 'truchet' || isOneOf('shape.type', ['arc'])(p) },
+  { key: 'shape.inner', type: 'range', label: '内径', min: 0.05, max: 0.95, step: 0.01,
+    showIf: isOneOf('shape.type', ['ring']) },
+  { key: 'shape.rotation', type: 'range', label: '旋转', min: 0, max: 360, step: 1,
+    showIf: (p) => !['maze', 'lattice'].includes(p['topology.mode']) },
+  { key: 'shape.rotMode', type: 'select', label: '旋转模式', options: opts(ROT_MODES, ROT_LABELS),
+    showIf: (p) => !['maze', 'lattice'].includes(p['topology.mode']) },
+  { key: 'shape.stroke', type: 'toggle', label: '描边模式',
+    showIf: (p) => !isWall(p) },
   { key: 'shape.strokeWidth', type: 'range', label: '线宽', min: 0.1, max: 60, step: 0.1,
-    showIf: (p) => !!p['shape.stroke'] || ['truchet', 'maze', 'lattice'].includes(p['topology.mode']) },
+    // 墙类（maze/lattice）的粗细走「尺寸」，线宽只在描边基元与 truchet 弧上有意义。
+    showIf: (p) => p['topology.mode'] === 'truchet' || (!isWall(p) && !!p['shape.stroke']) },
 
   { key: 'topology.mode', type: 'select', label: '拓扑', options: opts(TOPOLOGIES, TOPO_LABELS) },
   { key: 'topology.jitter', type: 'range', label: '抖动', min: 0, max: 1, step: 0.01 },
@@ -110,7 +119,7 @@ export const SCHEMA = [
   { key: 'topology.warpFreq', type: 'range', label: '形变频率', min: 0.1, max: 8, step: 0.05,
     showIf: (p) => Number(p['topology.warp']) > 0 },
   { key: 'topology.density', type: 'range', label: '连通密度', min: 0, max: 1, step: 0.01,
-    showIf: isOneOf('topology.mode', ['truchet', 'maze', 'lattice', 'halftone']) },
+    showIf: isOneOf('topology.mode', ['truchet', 'maze', 'lattice']) },
   { key: 'topology.halftoneLevels', type: 'range', label: '半调级数', min: 0, max: 1, step: 0.01,
     showIf: isOneOf('topology.mode', ['halftone']) },
 
@@ -167,6 +176,7 @@ export const DEFAULTS = {
   'shape.sides': 6,
   'shape.curvature': 0.35,
   'shape.sweep': 0.8,
+  'shape.inner': 0.55,
   'shape.rotation': 0,
   'shape.rotMode': 'none',
   'shape.stroke': false,

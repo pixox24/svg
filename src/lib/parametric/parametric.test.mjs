@@ -7,7 +7,7 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 
 import { hash2, noise2, fbm, mulberry32 } from './hash.js';
-import { resolve, LATTICES } from './lattice.js';
+import { resolve, LATTICES, CELL_BUDGET } from './lattice.js';
 import { evaluate, MODULATORS, AXES } from './modulator.js';
 import { build, sizeAt, SHAPES } from './primitive.js';
 import { apply, TOPOLOGIES } from './topology.js';
@@ -342,7 +342,7 @@ describe('topology', () => {
 
   for (const mode of TOPOLOGIES) {
     test(`${mode} returns an array`, () => {
-      assert.equal(TOPOLOGIES.length, 6);
+      assert.equal(TOPOLOGIES.length, 5);
       const out = apply(cells, { ...params, 'topology.mode': mode, 'topology.density': 0.75 }, {});
       assert.ok(Array.isArray(out), mode);
     });
@@ -553,5 +553,73 @@ describe('performance', () => {
     const ms = performance.now() - t0;
     assert.ok(r.stats.elements >= 20000, `elements ${r.stats.elements}`);
     assert.ok(ms < 2000, `ms ${ms}`);
+  });
+
+  test('cluster stays inside CELL_BUDGET at worst-case parameters', () => {
+    const p = defaults();
+    p['lattice.type'] = 'cluster';
+    p['lattice.cols'] = 40;
+    p['lattice.rows'] = 40;
+    p['lattice.clusterSize'] = 12;
+    const r = generate(p);
+    assert.ok(r.stats.elements <= CELL_BUDGET, `elements ${r.stats.elements}`);
+    assert.ok(r.svg.length < 2_000_000, `bytes ${r.svg.length}`);
+  });
+
+  test('stroke-width reaches primitives without per-element stroke-width', () => {
+    const base = { ...defaults(), 'shape.stroke': true, 'shape.type': 'dot', 'modulator.seed': 7 };
+    const thin = generate({ ...base, 'shape.strokeWidth': 1 }).svg;
+    const thick = generate({ ...base, 'shape.strokeWidth': 30 }).svg;
+    assert.notEqual(thin, thick);
+    assert.match(thin, /stroke-width="1"/);
+    assert.match(thick, /stroke-width="30"/);
+  });
+});
+
+describe('controls that used to be dead', () => {
+  test('radial honours axis and freq, and freq=1/radius keeps the legacy curve', () => {
+    const p = { ...defaults(), 'modulator.type': 'radial', 'modulator.bias': 0.5, 'modulator.amp': 1 };
+    const c = cell({ u: 0.3, v: 0.3, r: 0.3 });
+    const legacy = Math.min(1, Math.max(0, 0.5 + (1 - 0.3 * 2)));
+    assert.equal(evaluate(c, { ...p, 'modulator.axis': 'radius', 'modulator.freq': 1 }), legacy);
+    assert.notEqual(evaluate(c, { ...p, 'modulator.axis': 'y' }), legacy);
+    assert.notEqual(evaluate(c, { ...p, 'modulator.axis': 'radius', 'modulator.freq': 3 }), legacy);
+  });
+
+  test('golden honours the axis', () => {
+    const p = { ...defaults(), 'modulator.type': 'golden', 'modulator.freq': 1, 'modulator.bias': 0.5, 'modulator.amp': 1 };
+    const c = cell({ u: 0.3, v: 0.7, r: 0.3, n: 40 });
+    assert.notEqual(evaluate(c, { ...p, 'modulator.axis': 'radius' }), evaluate(c, { ...p, 'modulator.axis': 'y' }));
+  });
+
+  test('maze walls follow sizeMin/sizeMax and the modulator', () => {
+    const p = gridParams({
+      'topology.mode': 'maze', 'topology.density': 0,
+      'modulator.type': 'linear', 'modulator.axis': 'x', 'modulator.bias': 0.5, 'modulator.amp': 1,
+      'shape.sizeMin': 4, 'shape.sizeMax': 40,
+    });
+    const out = apply(resolve(p, 1000, 1000), p, {}).join('');
+    const widths = [...out.matchAll(/<line [^>]*stroke-width="([\d.]+)"/g)].map((m) => Number(m[1]));
+    assert.ok(widths.length > 8, `fragments ${widths.length}`);
+    assert.ok(Math.max(...widths) > Math.min(...widths), `uniform ${JSON.stringify([...new Set(widths)])}`);
+  });
+
+  test('truchet honours sweep and rotation', () => {
+    const base = { ...gridParams({ 'topology.mode': 'truchet', 'topology.density': 1 }), 'shape.type': 'arc' };
+    const a = apply(resolve(base, 1000, 1000), { ...base, 'shape.sweep': 0.3 }, {}).join('');
+    const b = apply(resolve(base, 1000, 1000), { ...base, 'shape.sweep': 0.9 }, {}).join('');
+    assert.notEqual(a, b);
+    const c = apply(resolve(base, 1000, 1000), { ...base, 'shape.rotation': 37 }, {}).join('');
+    assert.notEqual(a, c);
+  });
+
+  test('accent colour tints a subset instead of replacing the main colour', () => {
+    const svg = generate(gridParams({ palette: ['#f2eee6', '#101216', '#c2410c'] })).svg;
+    assert.match(svg, /#c2410c/);
+    assert.match(svg, /#101216/);
+  });
+
+  test('decodeParams returns null for a broken payload', () => {
+    assert.equal(decodeParams('%7Bnot-json'), null);
   });
 });

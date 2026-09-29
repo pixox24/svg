@@ -211,6 +211,9 @@ export function spiral(p) {
   return cells;
 }
 
+/** 元素总预算：唯一放大器是 cluster（点数 ∝ clusterSize²），按预算反解间距。 */
+export const CELL_BUDGET = 30000;
+
 /** 二级嵌套：簇内六角点阵 + 簇间六角平铺 */
 export function cluster(p) {
   const { w, h, cols, rows, clusterSize, clusterSpread } = p;
@@ -218,8 +221,11 @@ export function cluster(p) {
   const R = Math.min(w / (cols + 1), h / (rows * 0.9)) * 0.5;
   const stepX = R * Math.max(1.2, clusterSpread);
   const stepY = stepX * 0.866;
-  const dotStep = (R / Math.max(1, clusterSize)) * 1.0;
-  const lim = Math.ceil(clusterSize) + 1;
+  // 簇内点数 ≈ 3.63·(R/s)²。不设上限时 40×40 + 簇内 12 = 72 万元素 / 26MB SVG，浏览器卡死。
+  // ponytail: 用预算反解间距（保几何、不裁画布）；要更密就分批渲染，别放宽 CELL_BUDGET。
+  const perCluster = Math.max(4, Math.floor(CELL_BUDGET / Math.max(1, cols * rows)));
+  const dotStep = Math.max(R / Math.max(1, clusterSize), R * Math.sqrt(3.63 / perCluster));
+  const lim = Math.ceil(R / dotStep) + 1;
   let n = 0;
   for (let cj = 0; cj < rows; cj += 1) {
     for (let ci = 0; ci < cols; ci += 1) {

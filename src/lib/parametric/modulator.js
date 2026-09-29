@@ -39,9 +39,13 @@ export function evaluate(cell, p) {
     case 'linear':
       m = bias + amp * (t - 0.5) * 2;
       break;
-    case 'radial':
-      m = bias + amp * (1 - cell.r * 2);
+    case 'radial': {
+      // 作用轴决定从哪儿衰减：radius=画布中心，x/y/both/diag=对应轴的中线，angle=角度扇区。
+      // freq 是衰减速度；freq=1 且 axis=radius 时与旧实现 1-2r 逐像素一致。
+      const d = axis === 'radius' ? cell.r : Math.abs(t - 0.5) * 2;
+      m = bias + amp * (1 - 2 * Math.min(1, d * freq));
       break;
+    }
     case 'sine':
       m = bias + amp * 0.5 * Math.sin(t * TAU * freq + phase * TAU);
       break;
@@ -49,8 +53,10 @@ export function evaluate(cell, p) {
       m = bias + amp * (fbm(cell.u * freq * 4, cell.v * freq * 4, seed, 4) - 0.5) * 2;
       break;
     case 'golden': {
-      // 叶序式：以序号 × 黄金角 + 径向，产生无理数错位
-      const g = (cell.n * 0.6180339887 + cell.r * freq + phase) % 1;
+      // 叶序式：以序号 × 黄金角 + 坐标，产生无理数错位。
+      // 作用轴决定用哪个坐标：选「径向」用 r（叶序原生），其余用轴向坐标。
+      const q = axis === 'radius' ? cell.r : t;
+      const g = (cell.n * 0.6180339887 + q * freq + phase) % 1;
       m = bias + amp * (g - 0.5) * 2;
       break;
     }

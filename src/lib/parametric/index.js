@@ -172,13 +172,17 @@ export function encodeParams(input) {
   return encodeURIComponent(JSON.stringify(diff));
 }
 
-/** URL-safe 字符串 → 参数 */
+/**
+ * URL-safe 字符串 → 参数。
+ * 空串 = 默认参数；无法解析 = null —— 调用方自己决定怎么提示，
+ * 不再悄悄回退成默认值（那会让截断的分享链接看起来"正常但不是同一张图"）。
+ */
 export function decodeParams(str) {
   if (!str) return defaults();
   try {
     return normalize(JSON.parse(decodeURIComponent(str)));
   } catch {
-    return defaults();
+    return null;
   }
 }
 

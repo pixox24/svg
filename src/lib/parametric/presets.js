@@ -47,6 +47,9 @@ export const PRESETS = [
     // 改用 lattice 模式画完整墙网络后：276 条边、1 个连通分量、0 条越界，墨量随线宽线性可控。
     //
     // 线宽 21 时墨量 ≈ 48.5%（lattice 会走描边，所以线宽滑杆自动出现）。
+    // 线宽 21 时墨量≈48.5%（lattice 会走描边，所以线宽滑杆自动出现）。
+    // 墙厚现在由「尺寸」驱动（sizeMin/sizeMax + 调制），这里钉成 21/21 = 原线宽，
+    // 保证密度标定逐像素不变。
     params: preset({
       'canvas.aspect': 'banner',
       palette: [PAPER, INK, ''],
@@ -56,6 +59,8 @@ export const PRESETS = [
       'lattice.gap': 0.08,
       'topology.mode': 'lattice',
       'topology.density': 0,
+      'shape.sizeMin': 21,
+      'shape.sizeMax': 21,
       'shape.strokeWidth': 21,
       'modulator.seed': 7123,
     }),
@@ -339,6 +344,8 @@ export const PRESETS = [
     family: 'hex',
     ref: 'ref-14',
     // 参考前景 35.2% / 引擎 18.4% → 线宽 ×1.57 + 尺寸 ×1.07
+    // 弧度原写 0.72，但 truchet 过去强制 0.5，密度标定是按 0.5 做的；
+    // 现在 sweep 真正生效，这里显式钉 0.5 保持标定不变（想要回纹感可自行调到 0.72）。
     params: preset({
       'canvas.aspect': 'portrait',
       palette: [PAPER, INK, ''],
@@ -346,7 +353,7 @@ export const PRESETS = [
       'lattice.cols': 8,
       'lattice.rows': 14,
       'shape.type': 'arc',
-      'shape.sweep': 0.72,
+      'shape.sweep': 0.5,
       'shape.sizeMin': 130,
       'shape.sizeMax': 130,
       'shape.stroke': true,

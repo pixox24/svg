@@ -30,12 +30,11 @@ function colors(p) {
   const palette = Array.isArray(p.palette) ? p.palette : [];
   const bg = p.bg || palette[0] || '#f2eee6';
   const fg = palette[1] || '#101216';
-  const accent = palette[2] || '';
   const invert = !!p.invert;
   return {
     bg: invert ? fg : bg,
     fg: invert ? bg : fg,
-    accent,
+    // 强调色不进组：它只点缀被 tint() 选中的单元，否则就变成"覆盖主色"了。
   };
 }
 
@@ -50,10 +49,13 @@ export function compose(fragments, p) {
   const strokeMode = !!p['shape.stroke'];
   const topo = p['topology.mode'];
   const painting = strokeMode || topo === 'truchet' || topo === 'maze' || topo === 'lattice';
+  // stroke-width 必须落在 <g> 上：基元里只有 bar/arc/line 自带线宽，其余基元靠组继承，
+  // 否则描边模式下 6/8 种基元的线宽滑杆是死的。
+  const sw = clampNum(p['shape.strokeWidth'], 0.1, 200);
 
   const groupAttrs = painting
-    ? `fill="none" stroke="${esc(c.accent || c.fg)}" stroke-linecap="${topo === 'maze' ? 'square' : 'butt'}"`
-    : `fill="${esc(c.accent || c.fg)}" stroke="none"`;
+    ? `fill="none" stroke="${esc(c.fg)}" stroke-width="${sw}" stroke-linecap="${topo === 'maze' ? 'square' : 'butt'}"`
+    : `fill="${esc(c.fg)}" stroke="none"`;
 
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`,
@@ -72,4 +74,4 @@ export function emptyDoc(p) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><rect x="0" y="0" width="${w}" height="${h}" fill="${esc(c.bg)}"/></svg>`;
 }
 
-export { clampNum };
+export { clampNum, esc };

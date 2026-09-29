@@ -133,6 +133,8 @@
         </div>
         {#if exportNote}
           <p>{exportNote}</p>
+        {:else if renderNote}
+          <p class="warn">{renderNote}</p>
         {:else if !libraryOpen && current?.blurb}
           <p>{current.blurb}</p>
         {/if}
@@ -192,6 +194,7 @@
   let inspectorCollapsed = false;
   let exportNote = '';
   let noteTimer;
+  let compileTimer;
   let tabbiedStage;
   let tabbiedRaw = '';
   let tabbiedStatus = '';
@@ -208,6 +211,8 @@
   // Parametric families compile straight to a finished SVG document, so they must
   // skip css-doodle's svg() wrapper that every other family goes through.
   $: isParametric = family?.kind === 'parametric';
+  // 引擎的告警（渲染失败 / 一个元素都没出）不该静默：编译后挂到 family.lastWarnings。
+  $: renderNote = isParametric && code ? (family.lastWarnings?.[0] || '') : '';
   $: isCustom = !isNull(codeFromQuery) || selectedId === 'other';
   $: rendered = isTabbied ? '' : (isParametric ? code : svg(code));
   $: frameSize = toPixels(canvas, flipped, { scale: 1, dpi });
@@ -236,6 +241,8 @@
   }
 
   function handleChange(e) {
+    // 编辑器里改代码时必须掐掉待执行的重编译，否则它会用旧参数盖掉刚输入的内容。
+    clearTimeout(compileTimer);
     const next = e.detail;
     code = next;
     if (family && !ejected && next.trim() !== family.compile(params).trim()) {
@@ -253,7 +260,11 @@
     //   · 种子框里留着 100000，而实际按 0 绘制（"输入种子即可复现"就成了假的）
     //   · 改第三个色块只动了 palette[0]，而舞台底色仍读旧的 params.bg，两边脱节
     params = isParametric ? normalizeEngineParams(e.detail) : e.detail;
-    code = family.compile(params);
+    // 拖滑杆时每个 input 事件都全量重编译会掉帧：只防抖编译，面板数值即时响应。
+    clearTimeout(compileTimer);
+    compileTimer = setTimeout(() => {
+      code = family.compile(params);
+    }, 32);
   }
 
   function handleShuffle() {
@@ -591,10 +602,16 @@
       // loadSketch resolves synchronously for non-tabbied sketches, so the family is
       // ready here. Only parametric families understand a ?p= payload.
       if (storedParams && family && family.kind === 'parametric') {
-        params = decodeEngineParams(storedParams);
-        code = family.compile(params);
-        ejected = false;
-        if (editor) editor.updateCode(code);
+        // 解析失败不再静默回默认：保留预设参数，并把原因说出来。
+        const decoded = decodeEngineParams(storedParams);
+        if (decoded) {
+          params = decoded;
+          code = family.compile(params);
+          ejected = false;
+          if (editor) editor.updateCode(code);
+        } else {
+          note('Could not read the shared params');
+        }
       }
     }
   }
@@ -943,6 +960,10 @@
   .inspector-foot p {
     margin: 0;
     line-height: 1.45;
+  }
+
+  .inspector-foot p.warn {
+    color: var(--danger);
   }
 
   .inspector-foot button {

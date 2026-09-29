@@ -142,8 +142,7 @@ export function build(cell, m, p, seed) {
     case 'ring': {
       const rr = size / 2;
       const inner = rr * clampNum(p['shape.inner'] ?? 0.55, 0.05, 0.95);
-      const outer = (rr * a) > 0 ? rr * Math.max(a, 0.2) : rr;
-      return `<path d="M ${r2(cell.x - rr)} ${Y} a ${r2(rr)} ${r2(rr)} 0 1 0 ${r2(rr * 2)} 0 a ${r2(rr)} ${r2(rr)} 0 1 0 ${r2(-rr * 2)} 0 Z M ${r2(cell.x - inner)} ${Y} a ${r2(inner)} ${r2(inner)} 0 1 1 ${r2(inner * 2)} 0 a ${r2(inner)} ${r2(inner)} 0 1 1 ${r2(-inner * 2)} 0 Z" fill-rule="evenodd"${p['shape.scaleToUnit'] ? ` data-outer="${r2(outer)}"` : ''}/>`;
+      return `<path d="M ${r2(cell.x - rr)} ${Y} a ${r2(rr)} ${r2(rr)} 0 1 0 ${r2(rr * 2)} 0 a ${r2(rr)} ${r2(rr)} 0 1 0 ${r2(-rr * 2)} 0 Z M ${r2(cell.x - inner)} ${Y} a ${r2(inner)} ${r2(inner)} 0 1 1 ${r2(inner * 2)} 0 a ${r2(inner)} ${r2(inner)} 0 1 1 ${r2(-inner * 2)} 0 Z" fill-rule="evenodd"/>`;
     }
     case 'dot':
     default:
